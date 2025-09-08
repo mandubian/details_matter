@@ -397,9 +397,9 @@ def main():
             pass
 
     st.title("🎨 Matter of Details")
+    st.markdown("**Iteratively test how a generative model latches onto a single visual detail in an image and reimagines it inside entirely new scenes of its creation.**")
     st.markdown("[Project on GitHub](https://github.com/mandubian/details_matter) — licensed under Apache-2.0")
     st.markdown("*Context: This project was created quickly using AI code generators during the Google DeepMind hackathon on Kaggle (https://www.kaggle.com/competitions/banana). It could not be released on time due to Google API availability issues and personal duties (e.g., being a dad).*")
-    st.markdown("**Iteratively test how a generative model latches onto a single visual detail and reimagines it inside entirely new scenes.**")
     st.markdown(
         "Each turn: the model picks one salient detail from the previous image (a shape, object, texture, motif) and invents a different context that preserves only that detail's recognizable identity. "
         "By chaining these transformations you can observe what the model treats as the 'essence' of a thing—how far the surrounding world can drift while that tiny anchor persists."
