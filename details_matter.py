@@ -399,9 +399,11 @@ def main():
         st.sidebar.success("API Key loaded from environment variable (GEMINI_API_KEY)")
 
     # Main content area
+    # If API key not set, show a warning but continue rendering the sidebar so the user
+    # can enter or override the GEMINI_API_KEY there. Previously this returned early
+    # and prevented the sidebar from being displayed.
     if not st.session_state.api_key_set:
         st.warning("Please set the Google Gemini API Key in the left panel.")
-        return
 
         # Create sidebar for configuration and controls
     with st.sidebar:
