@@ -412,7 +412,16 @@ def main():
     # Show a short how-to when there is no conversation yet
     if not st.session_state.conversation:
         with st.expander("How to start (quick)", expanded=True):
-            st.markdown("1. Set or paste a Gemini API key in the left sidebar (use a throwaway or scoped key for demos).\n\n2. Enter an initial prompt in the 'Initial Prompt / Scene Setup' box.\n\n3. (Optional) Upload an initial image to seed the evolution.\n\n4. Click '🎬 Begin Single-Model Evolution' to generate the first AI turn.\n\n5. Use 'Continue Next Turn' or per-turn Regenerate buttons to explore how the model preserves a single detail across contexts.")
+            st.markdown(
+                "1. Set or paste a Gemini API key in the left sidebar (use a throwaway or scoped key for demos).\n\n"
+                "2. Enter an initial prompt in the 'Initial Prompt / Scene Setup' box.\n\n"
+                "3. (Optional) Upload an initial image to seed the evolution.\n\n"
+                "4. Click '🎬 Begin Single-Model Evolution' to generate the first AI turn.\n\n"
+                "5. Use 'Continue Next Turn' or per-turn Regenerate buttons to explore how the model preserves a single detail across contexts.\n\n"
+                "6. Save & reload sessions: use 'Save Current Session' in the sidebar to export the full session (JSON + images + ZIP). "
+                "Saved sessions are written to the app's `sessions/` directory and are accessible to anyone using the same app instance while it is running — download the ZIP to retain a private copy. "
+                "Saved session files do NOT include your Gemini API key; however, do not embed sensitive information in prompts or uploaded images that you don't want shared."
+            )
 
     # --- Main-page quick controls (visible on mobile) ---
     # Do not render quick controls when a session is loaded from a shared URL
@@ -425,6 +434,7 @@ def main():
         # API Key controls on main page (mirror of sidebar, session-only)
         if not st.session_state.api_key_set:
             st.info("Enter your Gemini API key below (stored in session only). This field is provided on the main page for mobile users who cannot see the sidebar.")
+            st.warning("Security: Use a throwaway/dev key here. This demo keeps it only in memory for your session, but if this app is deployed on a shared server, operators could still modify code to log it. Never use a production or billing-critical key.")
             main_input_key = st.text_input("Gemini API Key (main)", type="password", key="gemini_key_main", value="")
             if st.button("Set API Key (main)", key="set_api_main"):
                 if main_input_key.strip():
