@@ -400,6 +400,11 @@ def main():
     # Key now only resides in per-user session_state.gemini_api_key.
 
     # Main content area
+    # Show a short how-to when there is no conversation yet
+    if not st.session_state.conversation:
+        with st.expander("How to start (quick)", expanded=True):
+            st.markdown("1. Set or paste a Gemini API key in the left sidebar (use a throwaway or scoped key for demos).\n\n2. Enter an initial prompt in the 'Initial Prompt / Scene Setup' box.\n\n3. (Optional) Upload an initial image to seed the evolution.\n\n4. Click '🎬 Begin Single-Model Evolution' to generate the first AI turn.\n\n5. Use 'Continue Next Turn' or per-turn Regenerate buttons to explore how the model preserves a single detail across contexts.")
+
     # If API key not set, show a warning but continue rendering the sidebar so the user
     # can enter or override the GEMINI_API_KEY there. Previously this returned early
     # and prevented the sidebar from being displayed.
