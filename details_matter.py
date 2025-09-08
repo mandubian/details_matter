@@ -573,6 +573,50 @@ def main():
             # Load session
             st.subheader("📁 Load Past Session")
             sessions_dir = "sessions"
+
+            # Support loading a saved session directly via URL query parameter.
+            # Example: /?session=sessions/session_20250908_... will auto-load that session.json
+            try:
+                params = st.experimental_get_query_params()
+                target = params.get('session', [None])[0]
+            except Exception:
+                params = {}
+                target = None
+
+            if target:
+                # Normalize path and ensure it points inside the sessions directory
+                target_path = os.path.normpath(target)
+                # Only allow loading from the sessions dir for safety
+                if target_path.startswith(sessions_dir) and os.path.isdir(target_path):
+                    json_path = os.path.join(target_path, 'session.json')
+                    if os.path.exists(json_path):
+                        with open(json_path, 'r') as f:
+                            loaded_data = json.load(f)
+
+                        st.session_state.conversation = loaded_data.get("turns", [])
+                        st.session_state.current_turn = len(loaded_data.get("turns", []))
+                        st.session_state.style = loaded_data.get("style", st.session_state.style)
+
+                        # Restore images referenced in the session (copy into workspace if present)
+                        image_map = loaded_data.get("images", {})
+                        for original_path, session_img_path in image_map.items():
+                            full_session_img = os.path.join(target_path, session_img_path)
+                            if os.path.exists(full_session_img):
+                                dest_path = original_path
+                                try:
+                                    shutil.copy2(full_session_img, dest_path)
+                                except Exception:
+                                    pass
+                                for turn in st.session_state.conversation:
+                                    if turn.get('image_path') == original_path:
+                                        turn['image_path'] = dest_path
+
+                        # Clear query param to avoid reload loops and rerun to show loaded session
+                        st.experimental_set_query_params()
+                        st.success(f"Session loaded from URL: {target}")
+                        st.rerun()
+                else:
+                    st.error("Invalid or disallowed session path provided in URL parameter.")
             available_sessions = []
             if os.path.exists(sessions_dir):
                 for item in os.listdir(sessions_dir):
