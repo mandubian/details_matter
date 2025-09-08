@@ -389,7 +389,15 @@ def generate_next_turn(conversation: List[Dict], current_turn: int, model, style
     return new_turn, new_image
 
 def main():
+    # Helper to sync a selectbox widget value into the canonical session 'style'
+    def _sync_style_from(widget_key: str):
+        try:
+            st.session_state.style = st.session_state.get(widget_key, st.session_state.style)
+        except Exception:
+            pass
+
     st.title("🎨 Matter of Details")
+    st.markdown("[Project on GitHub](https://github.com/mandubian/details_matter) — licensed under Apache-2.0")
     st.markdown("**Iteratively test how a generative model latches onto a single visual detail and reimagines it inside entirely new scenes.**")
     st.markdown(
         "Each turn: the model picks one salient detail from the previous image (a shape, object, texture, motif) and invents a different context that preserves only that detail's recognizable identity. "
@@ -405,11 +413,125 @@ def main():
         with st.expander("How to start (quick)", expanded=True):
             st.markdown("1. Set or paste a Gemini API key in the left sidebar (use a throwaway or scoped key for demos).\n\n2. Enter an initial prompt in the 'Initial Prompt / Scene Setup' box.\n\n3. (Optional) Upload an initial image to seed the evolution.\n\n4. Click '🎬 Begin Single-Model Evolution' to generate the first AI turn.\n\n5. Use 'Continue Next Turn' or per-turn Regenerate buttons to explore how the model preserves a single detail across contexts.")
 
-    # If API key not set, show a warning but continue rendering the sidebar so the user
-    # can enter or override the GEMINI_API_KEY there. Previously this returned early
-    # and prevented the sidebar from being displayed.
-    if not st.session_state.api_key_set:
-        st.warning("Please set the Google Gemini API Key in the left panel.")
+    # --- Main-page quick controls (visible on mobile) ---
+    # Do not render quick controls when a session is loaded from a shared URL
+    if not st.session_state.get('loaded_session_from_url'):
+        st.markdown('<div id="quick_controls_block">', unsafe_allow_html=True)
+        st.markdown("## Quick Controls (main page)")
+
+    # Render Quick Controls and initial-run inputs only when NOT viewing a shared session
+    if not st.session_state.get('loaded_session_from_url'):
+        # API Key controls on main page (mirror of sidebar, session-only)
+        if not st.session_state.api_key_set:
+            st.info("Enter your Gemini API key below (stored in session only). This field is provided on the main page for mobile users who cannot see the sidebar.")
+            main_input_key = st.text_input("Gemini API Key (main)", type="password", key="gemini_key_main", value="")
+            if st.button("Set API Key (main)", key="set_api_main"):
+                if main_input_key.strip():
+                    st.session_state.gemini_api_key = main_input_key.strip()
+                    st.session_state.api_key_set = True
+                    st.success("API Key stored in session only.")
+                    st.rerun()
+                else:
+                    st.warning("Please provide a non-empty key.")
+        else:
+            # Do not allow overriding the in-memory key from the main page; keep override in sidebar only
+            st.caption("API key is set for this session. To override the key, use the left sidebar override control (keeps overrides in one place).")
+
+        # Art style selection (main page) - updates shared session_state.style
+        try:
+            style_index = ["Photorealistic", "Cartoon", "Abstract", "Fantasy", "Sci-Fi", "Surreal", "Anime", "Watercolor", "Oil Painting", "Digital Art", "Minimalist", "Vintage", "Cyberpunk", "Steampunk", "Impressionist", "Gothic", "Noir", "Pop Art", "Cubist", "Art Nouveau"].index(st.session_state.style)
+        except Exception:
+            style_index = 0
+        style_choice_main = st.selectbox(
+            "Art Style (main)",
+            ["Photorealistic", "Cartoon", "Abstract", "Fantasy", "Sci-Fi", "Surreal", "Anime", "Watercolor", "Oil Painting", "Digital Art", "Minimalist", "Vintage", "Cyberpunk", "Steampunk", "Impressionist", "Gothic", "Noir", "Pop Art", "Cubist", "Art Nouveau"],
+            index=style_index,
+            key="style_select_main",
+            on_change=_sync_style_from,
+            args=("style_select_main",),
+        )
+        # Ensure canonical session style matches main selection immediately
+        st.session_state.style = style_choice_main
+
+        # Initial prompt and upload on main page
+        st.text_area("Initial Prompt / Scene Setup (main)", placeholder="Describe starting point... e.g., 'A mysterious forest with glowing trees'", height=80, key="initial_prompt_main")
+        uploaded_file_main = st.file_uploader("Upload Initial Image (Optional) - main", type=['png', 'jpg', 'jpeg'], key="uploaded_main")
+        if uploaded_file_main is not None:
+            st.session_state.initial_image = Image.open(uploaded_file_main)
+            st.image(st.session_state.initial_image, caption="Uploaded Initial Image", width=200)
+
+        # Begin button on main page
+        if st.button("🎬 Begin Single-Model Evolution (main)", key="begin_main"):
+            initial_prompt = st.session_state.get("initial_prompt_main", "").strip()
+            if not initial_prompt:
+                st.warning("Please enter an initial prompt before starting.")
+            else:
+                if not st.session_state.api_key_set:
+                    st.warning("Please set the API key above to run generation.")
+                else:
+                    model = CreativeDialog(st.session_state.gemini_api_key)
+                    with st.spinner("Generating first image..."):
+                        initial_turn = {
+                            'model_name': 'Human Input',
+                            'text': initial_prompt,
+                            'image_path': None,
+                            'image_description': "Initial uploaded image" if st.session_state.initial_image else None,
+                            'prompt': None,
+                            'timestamp': time.strftime("%H:%M:%S")
+                        }
+                        if st.session_state.initial_image:
+                            initial_image_path = save_image(st.session_state.initial_image, "initial")
+                            initial_turn['image_path'] = initial_image_path
+                        st.session_state.conversation.append(initial_turn)
+
+                        new_turn, _ = generate_next_turn(
+                            st.session_state.conversation,
+                            1,
+                            model,
+                            st.session_state.style,
+                            initial_prompt,
+                            st.session_state.initial_image
+                        )
+                        if new_turn:
+                            st.session_state.conversation.append(new_turn)
+                            st.session_state.current_turn = 2
+                            st.success("First image generated!")
+                            st.rerun()
+
+        # Continue button on main page
+        if st.button("Continue Next Turn (main)", key="continue_main"):
+            if not st.session_state.api_key_set:
+                st.warning("Please set the API key above to run continuation.")
+            else:
+                model = CreativeDialog(st.session_state.gemini_api_key)
+                with st.spinner("Evolving image..."):
+                    new_turn, _ = generate_next_turn(
+                        st.session_state.conversation,
+                        st.session_state.current_turn,
+                        model,
+                        st.session_state.style,
+                        "",
+                        st.session_state.initial_image,
+                    )
+                    if new_turn:
+                        st.session_state.conversation.append(new_turn)
+                        st.session_state.current_turn += 1
+                        st.success(f"Turn {st.session_state.current_turn} generated!")
+                        st.rerun()
+
+        # Close the quick controls wrapper
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown("---")
+    else:
+        # Viewing a shared session via URL — hide the Quick Controls and initial-run inputs for cleaner presentation
+        pass
+
+    # If API key not set, show a warning on the main page unless we're viewing a shared session.
+    # The sidebar remains available for entering/overriding the key.
+    if not st.session_state.get('loaded_session_from_url'):
+        if not st.session_state.api_key_set:
+            st.warning("Please set the Google Gemini API Key in the left panel.")
 
         # Create sidebar for configuration and controls
     with st.sidebar:
@@ -468,14 +590,8 @@ def main():
                             st.success(f"Turn {st.session_state.current_turn} generated!")
                             st.rerun()
 
-        # Style selection (non-destructive, available without API key)
-        st.markdown("### Art Style")
-        st.session_state.style = st.selectbox(
-            "Art Style",
-            ["Photorealistic", "Cartoon", "Abstract", "Fantasy", "Sci-Fi", "Surreal", "Anime", "Watercolor", "Oil Painting", "Digital Art", "Minimalist", "Vintage", "Cyberpunk", "Steampunk", "Impressionist", "Gothic", "Noir", "Pop Art", "Cubist", "Art Nouveau"],
-            index=["Photorealistic", "Cartoon", "Abstract", "Fantasy", "Sci-Fi", "Surreal", "Anime", "Watercolor", "Oil Painting", "Digital Art", "Minimalist", "Vintage", "Cyberpunk", "Steampunk", "Impressionist", "Gothic", "Noir", "Pop Art", "Cubist", "Art Nouveau"].index(st.session_state.style) if st.session_state.style in ["Photorealistic", "Cartoon", "Abstract", "Fantasy", "Sci-Fi", "Surreal", "Anime", "Watercolor", "Oil Painting", "Digital Art", "Minimalist", "Vintage", "Cyberpunk", "Steampunk", "Impressionist", "Gothic", "Noir", "Pop Art", "Cubist", "Art Nouveau"] else 0,
-            key="style_select_sidebar",
-        )
+    # Note: sidebar art style selector removed per user request.
+    # Art style selection is available on the main page and next-to-thread controls.
 
         # --- Start Evolution (requires API key to actually run model) ---
         if len(st.session_state.conversation) == 0:
@@ -847,7 +963,7 @@ def main():
             if turn.get('image_path'):
                 # Use container width so generated images scale on small screens
                 try:
-                    st.image(turn['image_path'], caption=turn.get('image_description', 'Generated image'), use_container_width=True)
+                    st.image(turn['image_path'], caption=turn.get('image_description', 'Generated image'), width='stretch')
                 except TypeError:
                     # Fallback for older Streamlit versions
                     st.image(turn['image_path'], caption=turn.get('image_description', 'Generated image'))
@@ -913,26 +1029,74 @@ def main():
     if st.session_state.conversation:
         st.markdown(f"**🎯 Next: Evolve from Turn {st.session_state.current_turn - 1} | Style: {st.session_state.style}**")
 
-        # Allow continuing directly from the thread
-        if st.button("Continue Next Turn from Thread"):
-            if not st.session_state.api_key_set:
-                st.warning("Please set the API key in the sidebar first.")
-            else:
-                model = CreativeDialog(st.session_state.get("gemini_api_key", ""))
-                with st.spinner("Evolving image from thread..."):
-                    new_turn, _ = generate_next_turn(
-                        st.session_state.conversation,
-                        st.session_state.current_turn,
-                        model,
-                        st.session_state.style,
-                        "",
-                        None
-                    )
-                    if new_turn:
-                        st.session_state.conversation.append(new_turn)
-                        st.session_state.current_turn += 1
-                        st.success(f"Turn {st.session_state.current_turn} generated from thread!")
-                        st.rerun()
+        # Allow continuing directly from the thread with a selectable style
+        # Ensure continue button and style selector are aligned; set button height to match selectbox
+        st.markdown(
+            "<style>div.stButton>button{height:44px;}</style>",
+            unsafe_allow_html=True,
+        )
+        col_continue, col_style = st.columns([1, 1])
+        with col_continue:
+            if st.button("Continue Next Turn from Thread"):
+                if not st.session_state.api_key_set:
+                    st.warning("Please set the API key in the sidebar first.")
+                else:
+                    model = CreativeDialog(st.session_state.get("gemini_api_key", ""))
+                    with st.spinner("Evolving image from thread..."):
+                        new_turn, _ = generate_next_turn(
+                            st.session_state.conversation,
+                            st.session_state.current_turn,
+                            model,
+                            st.session_state.style,
+                            "",
+                            None
+                        )
+                        if new_turn:
+                            st.session_state.conversation.append(new_turn)
+                            st.session_state.current_turn += 1
+                            st.success(f"Turn {st.session_state.current_turn} generated from thread!")
+                            st.rerun()
+        with col_style:
+            try:
+                idx = ["Photorealistic", "Cartoon", "Abstract", "Fantasy", "Sci-Fi", "Surreal", "Anime", "Watercolor", "Oil Painting", "Digital Art", "Minimalist", "Vintage", "Cyberpunk", "Steampunk", "Impressionist", "Gothic", "Noir", "Pop Art", "Cubist", "Art Nouveau"].index(st.session_state.style)
+            except Exception:
+                idx = 0
+            sel_style = st.selectbox(
+                "Style for next turn",
+                ["Photorealistic", "Cartoon", "Abstract", "Fantasy", "Sci-Fi", "Surreal", "Anime", "Watercolor", "Oil Painting", "Digital Art", "Minimalist", "Vintage", "Cyberpunk", "Steampunk", "Impressionist", "Gothic", "Noir", "Pop Art", "Cubist", "Art Nouveau"],
+                index=idx,
+                key="thread_style_select",
+                on_change=_sync_style_from,
+                args=("thread_style_select",),
+            )
+
+        # Thread-level quick controls: Reset and Undo (mirror sidebar behavior)
+        st.markdown("---")
+        col_reset_thread, col_undo_thread = st.columns(2)
+        with col_reset_thread:
+            if st.button("🔄 Reset Evolution (thread)", key="reset_thread"):
+                for turn in st.session_state.conversation:
+                    if turn.get('image_path') and os.path.exists(turn['image_path']):
+                        try:
+                            os.remove(turn['image_path'])
+                        except Exception:
+                            pass
+                st.session_state.conversation = []
+                st.session_state.current_turn = 0
+                st.session_state.initial_image = None
+                st.rerun()
+        with col_undo_thread:
+            if st.button("⬅️ Undo Last Turn (thread)", key="undo_thread") and len(st.session_state.conversation) > 0:
+                last_turn = st.session_state.conversation.pop()
+                if last_turn.get('image_path') and os.path.exists(last_turn['image_path']):
+                    try:
+                        os.remove(last_turn['image_path'])
+                    except Exception:
+                        pass
+                st.session_state.current_turn -= 1
+                if st.session_state.current_turn < 0:
+                    st.session_state.current_turn = 0
+                st.rerun()
 
     # (Duplicate main-area controls removed — sidebar controls and single conversation display are retained above.)
 
