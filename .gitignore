@@ -16,3 +16,7 @@ generated_turn_*.png
 # ignore generated images
 generated_*
 images/generated_*
+
+# React app artifacts
+details_matter_react/node_modules/
+details_matter_react/build/
