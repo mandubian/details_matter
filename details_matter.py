@@ -509,26 +509,26 @@ def main():
                             st.success("First image generated!")
                             st.rerun()
 
-        # Continue button on main page
-        if st.button("Continue Next Turn (main)", key="continue_main"):
-            if not st.session_state.api_key_set:
-                st.warning("Please set the API key above to run continuation.")
-            else:
-                model = CreativeDialog(st.session_state.gemini_api_key)
-                with st.spinner("Evolving image..."):
-                    new_turn, _ = generate_next_turn(
-                        st.session_state.conversation,
-                        st.session_state.current_turn,
-                        model,
-                        st.session_state.style,
-                        "",
-                        st.session_state.initial_image,
-                    )
-                    if new_turn:
-                        st.session_state.conversation.append(new_turn)
-                        st.session_state.current_turn += 1
-                        st.success(f"Turn {st.session_state.current_turn} generated!")
-                        st.rerun()
+        # # Continue button on main page
+        # if st.button("Continue Next Turn (main)", key="continue_main"):
+        #     if not st.session_state.api_key_set:
+        #         st.warning("Please set the API key above to run continuation.")
+        #     else:
+        #         model = CreativeDialog(st.session_state.gemini_api_key)
+        #         with st.spinner("Evolving image..."):
+        #             new_turn, _ = generate_next_turn(
+        #                 st.session_state.conversation,
+        #                 st.session_state.current_turn,
+        #                 model,
+        #                 st.session_state.style,
+        #                 "",
+        #                 st.session_state.initial_image,
+        #             )
+        #             if new_turn:
+        #                 st.session_state.conversation.append(new_turn)
+        #                 st.session_state.current_turn += 1
+        #                 st.success(f"Turn {st.session_state.current_turn} generated!")
+        #                 st.rerun()
 
         # Close the quick controls wrapper
         st.markdown('</div>', unsafe_allow_html=True)
