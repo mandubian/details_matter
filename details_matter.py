@@ -778,43 +778,43 @@ def main():
         else:
             st.warning("No saved sessions found in the 'sessions' directory.")
 
-            # Show current state
-            if st.session_state.conversation:
-                with st.expander("🎬 Current Status"):
-                    col1_status, col2_status = st.columns(2)
-                    with col1_status:
-                        st.metric("Current Turn", st.session_state.current_turn)
-                    with col2_status:
-                        st.metric("Total Turns", len(st.session_state.conversation))
+        # Show current state
+        if st.session_state.conversation:
+            with st.expander("🎬 Current Status"):
+                col1_status, col2_status = st.columns(2)
+                with col1_status:
+                    st.metric("Current Turn", st.session_state.current_turn)
+                with col2_status:
+                    st.metric("Total Turns", len(st.session_state.conversation))
 
-            # Controls
-            st.subheader("🔄 Controls")
-            col1_ctrl, col2_ctrl = st.columns(2)
-            with col1_ctrl:
-                if st.button("🔄 Reset Evolution"):
-                    for turn in st.session_state.conversation:
-                        if turn['image_path'] and os.path.exists(turn['image_path']):
-                            os.remove(turn['image_path'])
-                    st.session_state.conversation = []
+        # Controls
+        st.subheader("🔄 Controls")
+        col1_ctrl, col2_ctrl = st.columns(2)
+        with col1_ctrl:
+            if st.button("🔄 Reset Evolution"):
+                for turn in st.session_state.conversation:
+                    if turn['image_path'] and os.path.exists(turn['image_path']):
+                        os.remove(turn['image_path'])
+                st.session_state.conversation = []
+                st.session_state.current_turn = 0
+                st.session_state.initial_image = None
+                st.rerun()
+        with col2_ctrl:
+            if st.button("⬅️ Undo Last Turn") and len(st.session_state.conversation) > 0:
+                last_turn = st.session_state.conversation.pop()
+                if last_turn['image_path'] and os.path.exists(last_turn['image_path']):
+                    os.remove(last_turn['image_path'])
+                st.session_state.current_turn -= 1
+                if st.session_state.current_turn < 0:
                     st.session_state.current_turn = 0
-                    st.session_state.initial_image = None
-                    st.rerun()
-            with col2_ctrl:
-                if st.button("⬅️ Undo Last Turn") and len(st.session_state.conversation) > 0:
-                    last_turn = st.session_state.conversation.pop()
-                    if last_turn['image_path'] and os.path.exists(last_turn['image_path']):
-                        os.remove(last_turn['image_path'])
-                    st.session_state.current_turn -= 1
-                    if st.session_state.current_turn < 0:
-                        st.session_state.current_turn = 0
-                    st.rerun()
+                st.rerun()
 
-            # Statistics
-            st.subheader("📊 Evolution Stats")
-            total_turns = len(st.session_state.conversation)
-            total_images = sum(1 for turn in st.session_state.conversation if turn['image_path'])
-            st.metric("Total Turns", total_turns)
-            st.metric("Images Generated", total_images)
+        # Statistics
+        st.subheader("📊 Evolution Stats")
+        total_turns = len(st.session_state.conversation)
+        total_images = sum(1 for turn in st.session_state.conversation if turn['image_path'])
+        st.metric("Total Turns", total_turns)
+        st.metric("Images Generated", total_images)
 
     # Main content area - Conversation display
     st.header("🎬 Look for more Details")
