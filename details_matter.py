@@ -492,6 +492,7 @@ def main():
             uploaded_file = st.file_uploader("Upload Initial Image (Optional)", type=['png', 'jpg', 'jpeg'])
             if uploaded_file is not None:
                 st.session_state.initial_image = Image.open(uploaded_file)
+                # Keep a small thumbnail preview
                 st.image(st.session_state.initial_image, caption="Uploaded Initial Image", width=200)
 
             # Trigger generation on button click; read the latest prompt from session_state inside the handler
@@ -844,7 +845,12 @@ def main():
 
             # Image content
             if turn.get('image_path'):
-                st.image(turn['image_path'], caption=turn.get('image_description', 'Generated image'), width=1024)
+                # Use container width so generated images scale on small screens
+                try:
+                    st.image(turn['image_path'], caption=turn.get('image_description', 'Generated image'), use_container_width=True)
+                except TypeError:
+                    # Fallback for older Streamlit versions
+                    st.image(turn['image_path'], caption=turn.get('image_description', 'Generated image'))
             else:
                 if turn.get('image_missing'):
                         st.warning("No image was generated for this turn.")
