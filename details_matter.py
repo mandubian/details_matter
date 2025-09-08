@@ -44,7 +44,7 @@ MODEL_ROLE_NAME = "Chief of Details"
 FIRST_TURN_PROMPT_TEMPLATE = "Generate an image based on this prompt: '{initial_prompt}'. Provide a description of the image."
 EVOLVE_PROMPT_TEMPLATE = (
     "Based on the previous image, select one important detail for you independently of the rest of the image (e.g., a specific object, character, or element). "
-    "Describe your choice in text and then imagine a new situation or anecdote or story or idea in which that detail is preserved as a detail, not necessarily the main subject of the image. "
+    "Describe your choice in text and then create a new story, situation, anecdote or other idea in which that detail is preserved as a detail, not necessarily the main subject of the image. "
     "Then, generate a new image from your description, while keeping only this detail recognizable."
 )
 ENHANCE_PROMPT_TEMPLATE = (
