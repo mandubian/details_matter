@@ -532,6 +532,7 @@ def main():
 
             # Export session
             st.subheader("📤 Save Session to Directory")
+            st.info("Note: Saved sessions are stored in the app's `sessions/` directory and are accessible to anyone using this app instance while it is running. If the host restarts or the workspace is cleaned, those sessions may be removed — download the ZIP to retain a local copy.")
             if st.button("Save Current Session"):
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M")
                 session_id = f"{timestamp}_{uuid.uuid4().hex[:8]}"
@@ -588,6 +589,7 @@ def main():
             # Load session
             st.subheader("📁 Load Past Session")
             sessions_dir = "sessions"
+            st.caption("Sessions are stored globally for this app instance; they are not private per-browser session.")
 
             # Support loading a saved session directly via URL query parameter.
             # Example: /?session=sessions/session_20250908_... will auto-load that session.json

@@ -47,6 +47,15 @@ An intentionally minimalist companion app focused on visual evolution through mi
 - **Dynamic Session Loading**: Auto-detects and lists saved sessions in dropdown; restores full state including images
 - **Persistent Creativity**: Load any saved session to continue complex world-building from any point
 
+### Important: Where sessions are stored
+
+This demo stores sessions in a local `sessions/` directory inside the application workspace. Important notes:
+
+- Saved sessions are accessible to anyone using the same app instance while it is running (they are not private per-browser-session).
+- If the host process or machine is restarted, the in-memory state and any non-downloaded session files may be deleted by the environment. Always download the ZIP when you want long-term access to generated images.
+
+If you want per-user privacy or durable storage across reboots, run the app with a persistent storage backend or modify the code to upload session archives to a user-specific cloud storage location.
+
 ### User Interface & Controls
 - **Sidebar Configuration**: API keys, model names, generation mode, art style selection
 - **Real-time Display**: Conversation history with Director guidance, generated text/images, persona status
