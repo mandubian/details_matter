@@ -571,7 +571,7 @@ def main():
                 st.success(f"Session saved to directory: {session_dir}")
                 try:
                     # Update URL to include the newly saved session so it can be shared/bookmarked
-                    st.experimental_set_query_params(session=session_dir)
+                    st.query_params = {**st.query_params, 'session': session_dir}
                     st.session_state.last_saved_session = session_dir
                 except Exception:
                     pass
@@ -666,6 +666,14 @@ def main():
                             # Rerun to reflect loaded session; because we've set loaded_session_from_url,
                             # this will not re-trigger the load when the page re-executes, and the URL
                             # param remains intact for sharing/bookmarking.
+                            # After loading from URL, show download button for that session if available
+                            try:
+                                zip_candidate = os.path.join(target, 'session.zip')
+                                if os.path.exists(zip_candidate):
+                                    with open(zip_candidate, 'rb') as f:
+                                        st.download_button(label="Download Session ZIP (loaded from URL)", data=f.read(), file_name=os.path.basename(zip_candidate), mime="application/zip")
+                            except Exception:
+                                pass
                             st.rerun()
                     else:
                         st.error("Invalid or disallowed session path provided in URL parameter.")
@@ -728,7 +736,7 @@ def main():
                         # Update the URL so the loaded session can be shared/bookmarked.
                         try:
                             # Use the selected session path as the session query parameter.
-                            st.experimental_set_query_params(session=selected_session)
+                            st.query_params = {**st.query_params, 'session': selected_session}
                             st.session_state.last_saved_session = selected_session
                         except Exception:
                             # If setting query params fails, fall back to success message and rerun.
