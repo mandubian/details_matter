@@ -388,8 +388,11 @@ def generate_next_turn(conversation: List[Dict], current_turn: int, model, style
 
 def main():
     st.title("🎨 Matter of Details")
-    st.markdown("**Explore the evolution of images through the lens of their intricate details.**")
-    st.markdown("This app appears to be an interactive image and story generation tool. It starts with a user-provided prompt, generating an initial image. On subsequent interactions, it analyzes the image to select a specific detail, then creates a new story based on that detail and generates a fresh image focused solely on that element. This creates an iterative, evolving narrative and visual experience.")
+    st.markdown("**Iteratively test how a generative model latches onto a single visual detail and reimagines it inside entirely new scenes.**")
+    st.markdown(
+        "Each turn: the model picks one salient detail from the previous image (a shape, object, texture, motif) and invents a different context that preserves only that detail's recognizable identity. "
+        "By chaining these transformations you can observe what the model treats as the 'essence' of a thing—how far the surrounding world can drift while that tiny anchor persists."
+    )
 
     # Check for environment variables at start
     gemini_key = os.environ.get("GEMINI_API_KEY")
