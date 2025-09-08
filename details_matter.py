@@ -27,7 +27,9 @@ if 'conversation' not in st.session_state:
 if 'current_turn' not in st.session_state:
     st.session_state.current_turn = 0
 if 'api_key_set' not in st.session_state:
-    st.session_state.api_key_set = False
+    st.session_state.api_key_set = False  # maintained for UI logic but no env writes
+if 'gemini_api_key' not in st.session_state:
+    st.session_state.gemini_api_key = None
 if 'style' not in st.session_state:
     st.session_state.style = "Photorealistic"
 if 'initial_image' not in st.session_state:
@@ -394,12 +396,8 @@ def main():
         "By chaining these transformations you can observe what the model treats as the 'essence' of a thing—how far the surrounding world can drift while that tiny anchor persists."
     )
 
-    # Check for environment variables at start
-    gemini_key = os.environ.get("GEMINI_API_KEY")
-    if gemini_key and st.session_state.api_key_set is False:
-        os.environ["GEMINI_API_KEY"] = gemini_key
-        st.session_state.api_key_set = True
-        st.sidebar.success("API Key loaded from environment variable (GEMINI_API_KEY)")
+    # Removed automatic environment variable loading to prevent leaking key across users.
+    # Key now only resides in per-user session_state.gemini_api_key.
 
     # Main content area
     # If API key not set, show a warning but continue rendering the sidebar so the user
@@ -414,26 +412,35 @@ def main():
 
         # API Key setup
         if not st.session_state.api_key_set:
-            st.info("No API key found in environment variables. Please enter it below or set GEMINI_API_KEY in your environment.")
-            gemini_key = st.text_input("Gemini API Key", type="password", key="gemini_key", value=os.environ.get("GEMINI_API_KEY", ""))
-            
-            if st.button("Set API Key") and gemini_key:
-                os.environ["GEMINI_API_KEY"] = gemini_key
-                st.session_state.api_key_set = True
-                st.success("API Key set!")
-                st.rerun()
+            st.info("Enter your Gemini API key below. It is stored only in your local session_state (never written to environment or disk, not shared with other users).")
+            st.warning("Security: Use a throwaway/dev key here. This demo keeps it only in memory for your session, but if this app is deployed on a shared server, operators could still modify code to log it. Never use a production or billing-critical key.")
+            input_key = st.text_input("Gemini API Key", type="password", key="gemini_key", value="")
+
+            if st.button("Set API Key"):
+                if input_key.strip():
+                    st.session_state.gemini_api_key = input_key.strip()
+                    st.session_state.api_key_set = True
+                    st.success("API Key stored in session only.")
+                    st.rerun()
+                else:
+                    st.warning("Please provide a non-empty key.")
         else:
-            # Show pre-filled input for override
-            current_gemini = st.text_input("Gemini API Key (Override)", type="password", key="override_gemini", value=os.environ.get("GEMINI_API_KEY", ""))
-            
-            if st.button("🔄 Override with New Key") and current_gemini:
-                os.environ["GEMINI_API_KEY"] = current_gemini
-                st.success("API Key overridden!")
-                st.rerun()
+            # Provide override without revealing existing key
+            new_key = st.text_input("Override Gemini API Key", type="password", key="override_gemini", value="")
+            st.warning("Overriding replaces the in-memory key. Same constraints: do not paste a sensitive production key.")
+            if st.button("🔄 Override with New Key"):
+                if new_key.strip():
+                    st.session_state.gemini_api_key = new_key.strip()
+                    st.success("API Key overridden in session.")
+                    st.rerun()
+                else:
+                    st.info("No override provided; existing session key kept.")
+
+            st.caption("Key never leaves this session process memory and is not exposed in environment variables.")
 
         if st.session_state.api_key_set:
-            # Initialize model
-            model = CreativeDialog(os.environ["GEMINI_API_KEY"])
+            # Initialize model from session-held key only
+            model = CreativeDialog(st.session_state.gemini_api_key)
 
             # Continue button if conversation exists
             if len(st.session_state.conversation) > 0:
@@ -761,7 +768,7 @@ def main():
 
                         if st.button(f"🔁 Regenerate image for Turn {i}"):
                             # Attempt to regenerate this turn by using its prompt or previous image
-                            model = CreativeDialog(os.environ.get("GEMINI_API_KEY", ""))
+                            model = CreativeDialog(st.session_state.get("gemini_api_key", ""))
                             prev_image = None
                             # If the turn recorded a fallback_from index, prefer that
                             if turn.get('fallback_from') is not None:
@@ -816,7 +823,7 @@ def main():
             if not st.session_state.api_key_set:
                 st.warning("Please set the API key in the sidebar first.")
             else:
-                model = CreativeDialog(os.environ.get("GEMINI_API_KEY", ""))
+                model = CreativeDialog(st.session_state.get("gemini_api_key", ""))
                 with st.spinner("Evolving image from thread..."):
                     new_turn, _ = generate_next_turn(
                         st.session_state.conversation,

@@ -202,6 +202,48 @@ This project demonstrates advanced AI orchestration patterns. Contributions welc
 
 For more information, see the [Nano-Banana Guide](https://github.com/google-gemini/nano-banana-hackathon-kit/blob/main/guides/02-use-nano-banana.ipynb).
 
+## API Key Handling & Security
+
+The `details_matter.py` app now keeps the Gemini API key **only in the current Streamlit session's memory (`st.session_state`)**. It is:
+
+- NOT written to environment variables
+- NOT persisted to disk
+- NOT embedded in exported sessions / JSON / ZIP
+- NOT echoed back in the UI after entry
+
+### Threat Model & Limitations
+
+This is a *demo / exploratory* tool. While the key isn't stored beyond your session, if you deploy this on infrastructure you don't fully control (public server, shared container, classroom machine):
+
+- A malicious or curious operator could still modify the code to log keys
+- Other Python processes on the same machine cannot read it directly, but injected code in this process could
+- Streamlit does not provide cryptographic isolation between users on a single shared process
+
+### Recommended Practices
+
+| Scenario | Recommended Action |
+|----------|--------------------|
+| Local personal experimentation | Paste a normal key; low risk |
+| Shared internal demo (trusted team) | Use a **scoped or secondary key** with quota limits |
+| Public internet demo | Proxy requests through a backend you control; never expose raw key |
+| Production multi-user service | Implement server-side tokenization or per-user OAuth-style brokerage |
+
+### Hardening Options (Not Implemented Here)
+
+- Reverse proxy microservice that accepts high-level generation requests and injects the real key server-side
+- Rate limiting & anomaly detection on backend calls
+- Ephemeral short-lived signed tokens exchanged for real key usage
+- Audit logging with redaction (hash keys before logging)
+
+### Why Not Environment Variables Anymore?
+
+Environment variables are **process-global**. In multi-user deployments, a single user setting `GEMINI_API_KEY` would unintentionally expose it to others and to any later code paths. Removing env writes enforces per-session isolation.
+
+### Quick Summary
+
+> Treat any browser-entered API key as recoverable by someone with deploy access. Use throwaway or limited-scope keys for demos.
+
+
 
 ## Future Concepts & Enhancements
 
