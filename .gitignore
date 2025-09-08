@@ -10,3 +10,9 @@ wheels/
 .venv
 images
 sessions
+
+generated_turn_*.png
+
+# ignore generated images
+generated_*
+images/generated_*
