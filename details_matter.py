@@ -571,7 +571,8 @@ def main():
                 st.success(f"Session saved to directory: {session_dir}")
                 try:
                     # Update URL to include the newly saved session so it can be shared/bookmarked
-                    st.query_params['session'] = session_dir
+                    st.experimental_set_query_params(session=session_dir)
+                    st.session_state.last_saved_session = session_dir
                 except Exception:
                     pass
                 
@@ -612,6 +613,17 @@ def main():
             except Exception:
                 params = {}
                 target = None
+
+            # If we have a known last saved session in this session, prefer that for download UI
+            url_session_for_download = st.session_state.get('last_saved_session') or target
+            if url_session_for_download:
+                candidate_zip = os.path.join(url_session_for_download, 'session.zip')
+                if os.path.exists(candidate_zip):
+                    try:
+                        with open(candidate_zip, 'rb') as f:
+                            st.download_button(label="Download Session ZIP (saved)", data=f.read(), file_name=os.path.basename(candidate_zip), mime="application/zip")
+                    except Exception:
+                        pass
 
             if target:
                 # If we've already loaded this session from the URL during this app run,
@@ -716,7 +728,8 @@ def main():
                         # Update the URL so the loaded session can be shared/bookmarked.
                         try:
                             # Use the selected session path as the session query parameter.
-                            st.query_params['session']=selected_session
+                            st.experimental_set_query_params(session=selected_session)
+                            st.session_state.last_saved_session = selected_session
                         except Exception:
                             # If setting query params fails, fall back to success message and rerun.
                             pass
