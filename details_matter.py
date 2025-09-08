@@ -575,21 +575,29 @@ def main():
                 except Exception:
                     pass
                 
-                # Download zip
+                # Create and persist the ZIP on disk so it's available after a reload.
                 import zipfile
-                zip_buffer = io.BytesIO()
-                with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-                    zip_file.writestr("session.json", json.dumps(export_data, indent=2, default=str))
-                    for src, dest in image_map.items():
-                        zip_file.write(src, dest)
-                
-                zip_buffer.seek(0)
-                st.download_button(
-                    label="Download Session Zip",
-                    data=zip_buffer.getvalue(),
-                    file_name=f"session_{session_id}.zip",
-                    mime="application/zip"
-                )
+                zip_path = f"{session_dir}/session.zip"
+                try:
+                    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zip_file:
+                        zip_file.writestr("session.json", json.dumps(export_data, indent=2, default=str))
+                        for src, dest in image_map.items():
+                            try:
+                                zip_file.write(src, dest)
+                            except Exception:
+                                # If a file can't be added, skip it
+                                pass
+
+                    # Provide immediate download from persisted file so the button still works after reload
+                    with open(zip_path, "rb") as zf:
+                        st.download_button(
+                            label="Download Session Zip",
+                            data=zf.read(),
+                            file_name=os.path.basename(zip_path),
+                            mime="application/zip"
+                        )
+                except Exception as e:
+                    st.error(f"Failed to create session ZIP: {e}")
 
             # Load session
             st.subheader("📁 Load Past Session")
@@ -660,6 +668,31 @@ def main():
             
             if available_sessions:
                 selected_session = st.selectbox("Select Session to Load", ["None"] + available_sessions)
+                # If session is present in URL params, show its ZIP download if available
+                try:
+                    params = st.query_params.to_dict()
+                    url_session = params.get('session')
+                except Exception:
+                    url_session = None
+
+                if url_session:
+                    candidate_zip = os.path.join(url_session, 'session.zip')
+                    if os.path.exists(candidate_zip):
+                        try:
+                            with open(candidate_zip, 'rb') as f:
+                                st.download_button(label="Download Session ZIP (from URL)", data=f.read(), file_name=os.path.basename(candidate_zip), mime="application/zip")
+                        except Exception:
+                            pass
+
+                # Also show download button for the selected session (if it contains session.zip)
+                if selected_session != "None":
+                    candidate_zip = f"{selected_session}/session.zip"
+                    if os.path.exists(candidate_zip):
+                        try:
+                            with open(candidate_zip, "rb") as f:
+                                st.download_button(label="Download Session ZIP", data=f.read(), file_name=os.path.basename(candidate_zip), mime="application/zip")
+                        except Exception:
+                            pass
                 if st.button("Load Session") and selected_session != "None":
                     json_path = f"{selected_session}/session.json"
                     if os.path.exists(json_path):
