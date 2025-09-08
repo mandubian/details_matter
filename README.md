@@ -14,11 +14,6 @@ This approach produces content that's not just generated, but **emergently co-au
 
 ## Applications
 
-### Directed Creative Dialog App (`dialog_app.py`)
-A Streamlit-based interface for autonomous, directed AI collaboration. Features multimodal input (text + images), dynamic persona management, world bible evolution, and comprehensive session saving/loading. Uses `gemini-2.5-flash-image-preview` for text+image generation and OpenRouter's DeepSeek for Director AI orchestration.
-
-**Note:** `main.py` is legacy; use `dialog_app.py` for all functionality.
-
 ### Details Matter App (`details_matter.py`)
 An intentionally minimalist companion app focused on visual evolution through micro-detail preservation. You start with a prompt (and optionally an image). Each AI turn: (1) inspects the previous image, (2) chooses exactly one visually meaningful detail (object, motif, texture, symbol), (3) states that choice in the first sentence (shown in bold), (4) invents a new narrative context where only that detail remains recognizable, and (5) generates a new image that discards everything else. Over successive turns the scene drifts radically while a tiny thread of continuity persists—letting you observe how meaning mutates when anchored by a single fragment. The app supports style switching per turn, fallback image regeneration if the model returns only text, second‑pass image-only retries, per-turn regeneration for failures, and full session save/load (JSON + images + ZIP). Use it to study constraint-driven divergence, aesthetic decay, or emergent reinterpretation of a chosen visual seed.
 
