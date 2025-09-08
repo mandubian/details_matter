@@ -15,7 +15,7 @@ import shutil  # For copying images to session directory
 
 # Configure page
 st.set_page_config(
-    page_title="Single AI Image Evolution",
+    page_title="Only Details Matter",
     page_icon="🎨",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -443,11 +443,12 @@ def main():
 
             st.caption("Key never leaves this session process memory and is not exposed in environment variables.")
 
+        # Sidebar controls (some features require API key)
+        # Continue button if conversation exists (requires API key)
         if st.session_state.api_key_set:
             # Initialize model from session-held key only
             model = CreativeDialog(st.session_state.gemini_api_key)
 
-            # Continue button if conversation exists
             if len(st.session_state.conversation) > 0:
                 # Emphasize continuation visually
                 st.header("🎬 Continue Evolution")
@@ -467,38 +468,43 @@ def main():
                             st.success(f"Turn {st.session_state.current_turn} generated!")
                             st.rerun()
 
-            # Style selection
-            st.markdown("### Art Style")
-            st.session_state.style = st.selectbox(
-                "Art Style",
-                ["Photorealistic", "Cartoon", "Abstract", "Fantasy", "Sci-Fi", "Surreal", "Anime", "Watercolor", "Oil Painting", "Digital Art", "Minimalist", "Vintage", "Cyberpunk", "Steampunk", "Impressionist", "Gothic", "Noir", "Pop Art", "Cubist", "Art Nouveau"],
-                index=["Photorealistic", "Cartoon", "Abstract", "Fantasy", "Sci-Fi", "Surreal", "Anime", "Watercolor", "Oil Painting", "Digital Art", "Minimalist", "Vintage", "Cyberpunk", "Steampunk", "Impressionist", "Gothic", "Noir", "Pop Art", "Cubist", "Art Nouveau"].index(st.session_state.style) if st.session_state.style in ["Photorealistic", "Cartoon", "Abstract", "Fantasy", "Sci-Fi", "Surreal", "Anime", "Watercolor", "Oil Painting", "Digital Art", "Minimalist", "Vintage", "Cyberpunk", "Steampunk", "Impressionist", "Gothic", "Noir", "Pop Art", "Cubist", "Art Nouveau"] else 0,
-                key="style_select_sidebar",
+        # Style selection (non-destructive, available without API key)
+        st.markdown("### Art Style")
+        st.session_state.style = st.selectbox(
+            "Art Style",
+            ["Photorealistic", "Cartoon", "Abstract", "Fantasy", "Sci-Fi", "Surreal", "Anime", "Watercolor", "Oil Painting", "Digital Art", "Minimalist", "Vintage", "Cyberpunk", "Steampunk", "Impressionist", "Gothic", "Noir", "Pop Art", "Cubist", "Art Nouveau"],
+            index=["Photorealistic", "Cartoon", "Abstract", "Fantasy", "Sci-Fi", "Surreal", "Anime", "Watercolor", "Oil Painting", "Digital Art", "Minimalist", "Vintage", "Cyberpunk", "Steampunk", "Impressionist", "Gothic", "Noir", "Pop Art", "Cubist", "Art Nouveau"].index(st.session_state.style) if st.session_state.style in ["Photorealistic", "Cartoon", "Abstract", "Fantasy", "Sci-Fi", "Surreal", "Anime", "Watercolor", "Oil Painting", "Digital Art", "Minimalist", "Vintage", "Cyberpunk", "Steampunk", "Impressionist", "Gothic", "Noir", "Pop Art", "Cubist", "Art Nouveau"] else 0,
+            key="style_select_sidebar",
+        )
+
+        # --- Start Evolution (requires API key to actually run model) ---
+        if len(st.session_state.conversation) == 0:
+            st.subheader("🚀 Start Evolution")
+
+            # Use session state key so the button reads the latest value on first click
+            st.text_area(
+                "Initial Prompt / Scene Setup",
+                placeholder="Describe starting point... e.g., 'A mysterious forest with glowing trees'",
+                height=80,
+                key="initial_prompt_input"
             )
 
-            # --- Start Evolution (moved here) ---
-            if len(st.session_state.conversation) == 0:
-                st.subheader("🚀 Start Evolution")
+            uploaded_file = st.file_uploader("Upload Initial Image (Optional)", type=['png', 'jpg', 'jpeg'])
+            if uploaded_file is not None:
+                st.session_state.initial_image = Image.open(uploaded_file)
+                st.image(st.session_state.initial_image, caption="Uploaded Initial Image", width=200)
 
-                # Use session state key so the button reads the latest value on first click
-                st.text_area(
-                    "Initial Prompt / Scene Setup",
-                    placeholder="Describe starting point... e.g., 'A mysterious forest with glowing trees'",
-                    height=80,
-                    key="initial_prompt_input"
-                )
-
-                uploaded_file = st.file_uploader("Upload Initial Image (Optional)", type=['png', 'jpg', 'jpeg'])
-                if uploaded_file is not None:
-                    st.session_state.initial_image = Image.open(uploaded_file)
-                    st.image(st.session_state.initial_image, caption="Uploaded Initial Image", width=200)
-
-                # Trigger generation on button click; read the latest prompt from session_state inside the handler
-                if st.button("🎬 Begin Single-Model Evolution", type="primary"):
-                    initial_prompt = st.session_state.get("initial_prompt_input", "").strip()
-                    if not initial_prompt:
-                        st.warning("Please enter an initial prompt before starting.")
+            # Trigger generation on button click; read the latest prompt from session_state inside the handler
+            if st.button("🎬 Begin Single-Model Evolution", type="primary"):
+                initial_prompt = st.session_state.get("initial_prompt_input", "").strip()
+                if not initial_prompt:
+                    st.warning("Please enter an initial prompt before starting.")
+                else:
+                    if not st.session_state.api_key_set:
+                        st.warning("Please set the API key in the sidebar to run generation.")
                     else:
+                        # Create model from session key and run
+                        model = CreativeDialog(st.session_state.gemini_api_key)
                         with st.spinner("Generating first image..."):
                             # Add human input as turn 0
                             initial_turn = {
@@ -528,272 +534,249 @@ def main():
                                 st.session_state.current_turn = 2
                                 st.success("First image generated!")
                                 st.rerun()
-            # --- End moved Start Evolution ---
 
-            # Controls
-            # add space before the controls to separate from configuration
-            st.markdown("<br><br>", unsafe_allow_html=True)
-            st.header("🎮 Controls")
+        # --- End Start Evolution ---
 
-            # Export session
-            st.subheader("📤 Save Session to Directory")
-            st.info("Note: Saved sessions are stored in the app's `sessions/` directory and are accessible to anyone using this app instance while it is running. If the host restarts or the workspace is cleaned, those sessions may be removed — download the ZIP to retain a local copy.")
-            if st.button("Save Current Session"):
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-                session_id = f"{timestamp}_{uuid.uuid4().hex[:8]}"
-                session_dir = f"sessions/session_{session_id}"
-                os.makedirs(session_dir, exist_ok=True)
-                os.makedirs(f"{session_dir}/images", exist_ok=True)
-                
-                export_data = {
-                    "session_id": session_id,
-                    "style": st.session_state.style,
-                    "turns": st.session_state.conversation,
-                    "images": {}
-                }
-                
-                # Copy images
-                image_map = {}
-                for turn in st.session_state.conversation:
-                    if turn.get('image_path') and os.path.exists(turn['image_path']):
-                        img_filename = os.path.basename(turn['image_path'])
-                        dest_path = f"{session_dir}/images/{img_filename}"
-                        shutil.copy2(turn['image_path'], dest_path)
-                        image_map[turn['image_path']] = f"images/{img_filename}"
-                
-                export_data["images"] = image_map
-                
-                # Save JSON
-                json_path = f"{session_dir}/session.json"
-                with open(json_path, 'w') as f:
-                    json.dump(export_data, f, indent=2, default=str)
-                
-                st.success(f"Session saved to directory: {session_dir}")
+        # add space before the controls to separate from configuration
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        st.header("🎮 Controls")
 
-                # Create and persist the ZIP on disk so it's available after a reload.
+        # Export session
+        st.subheader("📤 Save Session to Directory")
+        st.info("Note: Saved sessions are stored in the app's `sessions/` directory and are accessible to anyone using this app instance while it is running. If the host restarts or the workspace is cleaned, those sessions may be removed — download the ZIP to retain a local copy.")
+        if st.button("Save Current Session"):
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+            session_id = f"{timestamp}_{uuid.uuid4().hex[:8]}"
+            session_dir = f"sessions/session_{session_id}"
+            os.makedirs(session_dir, exist_ok=True)
+            os.makedirs(f"{session_dir}/images", exist_ok=True)
+            
+            export_data = {
+                "session_id": session_id,
+                "style": st.session_state.style,
+                "turns": st.session_state.conversation,
+                "images": {}
+            }
+            
+            # Copy images
+            image_map = {}
+            for turn in st.session_state.conversation:
+                if turn.get('image_path') and os.path.exists(turn['image_path']):
+                    img_filename = os.path.basename(turn['image_path'])
+                    dest_path = f"{session_dir}/images/{img_filename}"
+                    shutil.copy2(turn['image_path'], dest_path)
+                    image_map[turn['image_path']] = f"images/{img_filename}"
+            
+            export_data["images"] = image_map
+            
+            # Save JSON
+            json_path = f"{session_dir}/session.json"
+            with open(json_path, 'w') as f:
+                json.dump(export_data, f, indent=2, default=str)
+            
+            st.success(f"Session saved to directory: {session_dir}")
+
+            # Create and persist the ZIP on disk so it's available after a reload.
+            import zipfile
+            zip_path = f"{session_dir}/session.zip"
+            try:
+                with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zip_file:
+                    # Add session.json
+                    zip_file.writestr("session.json", json.dumps(export_data, indent=2, default=str))
+                    # Add the copied images from the session directory so the ZIP is self-contained
+                    for original_path, session_rel in image_map.items():
+                        full_session_img = os.path.join(session_dir, session_rel)
+                        try:
+                            if os.path.exists(full_session_img):
+                                zip_file.write(full_session_img, arcname=session_rel)
+                        except Exception:
+                            # If a file can't be added, skip it
+                            pass
+
+                # Provide immediate download from persisted file so the button still works after reload
+                with open(zip_path, "rb") as zf:
+                    st.download_button(
+                        label="Download Session Zip",
+                        data=zf.read(),
+                        file_name=os.path.basename(zip_path),
+                        mime="application/zip"
+                    )
+
+                # Now that the ZIP exists, update the URL so the session can be shared/bookmarked
+                try:
+                    st.query_params['session'] = session_dir
+                    st.session_state.last_saved_session = session_dir
+                except Exception:
+                    pass
+            except Exception as e:
+                st.error(f"Failed to create session ZIP: {e}")
+
+        # Load session
+        st.subheader("📁 Load Past Session")
+        sessions_dir = "sessions"
+        st.caption("Sessions are stored globally for this app instance; they are not private per-browser session.")
+
+        # Support loading a saved session directly via URL query parameter.
+        # Example: /?session=sessions/session_20250908_... will auto-load that session.json
+        try:
+            params = st.query_params.to_dict()
+            target = params.get('session', None)
+        except Exception:
+            params = {}
+            target = None
+
+        # If we have a known last saved session in this session, prefer that for download UI
+        url_session_for_download = st.session_state.get('last_saved_session') or target
+        if url_session_for_download:
+            candidate_zip = os.path.join(url_session_for_download, 'session.zip')
+            if os.path.exists(candidate_zip):
+                try:
+                    with open(candidate_zip, 'rb') as f:
+                        st.download_button(label="Download Session ZIP (saved)", data=f.read(), file_name=os.path.basename(candidate_zip), mime="application/zip")
+                except Exception:
+                    pass
+            else:
+                # create zip if missing
                 import zipfile
-                zip_path = f"{session_dir}/session.zip"
+                zip_path = candidate_zip
                 try:
                     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zip_file:
-                        # Add session.json
-                        zip_file.writestr("session.json", json.dumps(export_data, indent=2, default=str))
-                        # Add the copied images from the session directory so the ZIP is self-contained
-                        for original_path, session_rel in image_map.items():
-                            full_session_img = os.path.join(session_dir, session_rel)
-                            try:
-                                if os.path.exists(full_session_img):
-                                    zip_file.write(full_session_img, arcname=session_rel)
-                            except Exception:
-                                # If a file can't be added, skip it
-                                pass
+                        json_path = os.path.join(url_session_for_download, 'session.json')
+                        if os.path.exists(json_path):
+                            with open(json_path, 'r') as f:
+                                export_data = json.load(f)
+                            # Add session.json
+                            zip_file.writestr("session.json", json.dumps(export_data, indent=2, default=str))
+                            # Add the copied images from the session directory so the ZIP is self-contained
+                            image_map = export_data.get("images", {})
+                            for original_path, session_rel in image_map.items():
+                                full_session_img = os.path.join(url_session_for_download, session_rel)
+                                try:
+                                    if os.path.exists(full_session_img):
+                                        zip_file.write(full_session_img, arcname=session_rel)
+                                except Exception:
+                                    # If a file can't be added, skip it
+                                    pass
 
                     # Provide immediate download from persisted file so the button still works after reload
                     with open(zip_path, "rb") as zf:
                         st.download_button(
-                            label="Download Session Zip",
+                            label="Download Session ZIP (created)",
                             data=zf.read(),
                             file_name=os.path.basename(zip_path),
                             mime="application/zip"
                         )
-
-                    # Now that the ZIP exists, update the URL so the session can be shared/bookmarked
-                    try:
-                        st.query_params['session'] = session_dir
-                        st.session_state.last_saved_session = session_dir
-                    except Exception:
-                        pass
                 except Exception as e:
                     st.error(f"Failed to create session ZIP: {e}")
 
-            # Load session
-            st.subheader("📁 Load Past Session")
-            sessions_dir = "sessions"
-            st.caption("Sessions are stored globally for this app instance; they are not private per-browser session.")
-
-            # Support loading a saved session directly via URL query parameter.
-            # Example: /?session=sessions/session_20250908_... will auto-load that session.json
-            try:
-                params = st.query_params.to_dict()
-                target = params.get('session', None)
-            except Exception:
-                params = {}
-                target = None
-
-            # If we have a known last saved session in this session, prefer that for download UI
-            url_session_for_download = st.session_state.get('last_saved_session') or target
-            if url_session_for_download:
-                candidate_zip = os.path.join(url_session_for_download, 'session.zip')
-                if os.path.exists(candidate_zip):
-                    try:
-                        with open(candidate_zip, 'rb') as f:
-                            st.download_button(label="Download Session ZIP (saved)", data=f.read(), file_name=os.path.basename(candidate_zip), mime="application/zip")
-                    except Exception:
-                        pass
-                else:
-                    # create zip if missing
-                    import zipfile
-                    zip_path = candidate_zip
-                    try:
-                        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zip_file:
-                            json_path = os.path.join(url_session_for_download, 'session.json')
-                            if os.path.exists(json_path):
-                                with open(json_path, 'r') as f:
-                                    export_data = json.load(f)
-                                # Add session.json
-                                zip_file.writestr("session.json", json.dumps(export_data, indent=2, default=str))
-                                # Add the copied images from the session directory so the ZIP is self-contained
-                                image_map = export_data.get("images", {})
-                                for original_path, session_rel in image_map.items():
-                                    full_session_img = os.path.join(url_session_for_download, session_rel)
-                                    try:
-                                        if os.path.exists(full_session_img):
-                                            zip_file.write(full_session_img, arcname=session_rel)
-                                    except Exception:
-                                        # If a file can't be added, skip it
-                                        pass
-
-                        # Provide immediate download from persisted file so the button still works after reload
-                        with open(zip_path, "rb") as zf:
-                            st.download_button(
-                                label="Download Session ZIP (created)",
-                                data=zf.read(),
-                                file_name=os.path.basename(zip_path),
-                                mime="application/zip"
-                            )
-                    except Exception as e:
-                        st.error(f"Failed to create session ZIP: {e}")
-
-            if target:
-                # If we've already loaded this session from the URL during this app run,
-                # skip re-loading to avoid a reload loop while keeping the param in the URL.
-                if st.session_state.get('loaded_session_from_url') == target:
-                    # already loaded, do nothing
-                    pass
-                else:
-                    # Normalize path and ensure it points inside the sessions directory
-                    target_path = os.path.normpath(target)
-                    # Only allow loading from the sessions dir for safety
-                    if target_path.startswith(sessions_dir) and os.path.isdir(target_path):
-                        json_path = os.path.join(target_path, 'session.json')
-                        if os.path.exists(json_path):
-                            with open(json_path, 'r') as f:
-                                loaded_data = json.load(f)
-
-                            st.session_state.conversation = loaded_data.get("turns", [])
-                            st.session_state.current_turn = len(loaded_data.get("turns", []))
-                            st.session_state.style = loaded_data.get("style", st.session_state.style)
-
-                            # Restore images referenced in the session (copy into workspace if present)
-                            image_map = loaded_data.get("images", {})
-                            for original_path, session_img_path in image_map.items():
-                                full_session_img = os.path.join(target_path, session_img_path)
-                                if os.path.exists(full_session_img):
-                                    dest_path = original_path
-                                    try:
-                                        shutil.copy2(full_session_img, dest_path)
-                                    except Exception:
-                                        pass
-                                    for turn in st.session_state.conversation:
-                                        if turn.get('image_path') == original_path:
-                                            turn['image_path'] = dest_path
-
-                            # Record that we've loaded this session from URL so we don't reload again
-                            st.session_state['loaded_session_from_url'] = target
-
-                            st.success(f"Session loaded from URL: {target}")
-                            # Rerun to reflect loaded session; because we've set loaded_session_from_url,
-                            # this will not re-trigger the load when the page re-executes, and the URL
-                            # param remains intact for sharing/bookmarking.
-                            # After loading from URL, show download button for that session if available
-                            # try:
-                            #     zip_candidate = os.path.join(target, 'session.zip')
-                            #     if os.path.exists(zip_candidate):
-                            #         with open(zip_candidate, 'rb') as f:
-                            #             st.download_button(label="Download Session ZIP (loaded from URL)", data=f.read(), file_name=os.path.basename(zip_candidate), mime="application/zip")
-                            # except Exception:
-                            #     pass
-                            st.rerun()
-                    else:
-                        st.error("Invalid or disallowed session path provided in URL parameter.")
-            available_sessions = []
-            if os.path.exists(sessions_dir):
-                candidates = []
-                for item in os.listdir(sessions_dir):
-                    session_path = os.path.join(sessions_dir, item)
-                    if os.path.isdir(session_path):
-                        json_path = os.path.join(session_path, "session.json")
-                        if os.path.exists(json_path):
-                            try:
-                                mtime = os.path.getmtime(session_path)
-                            except Exception:
-                                mtime = 0
-                            candidates.append((mtime, f"{sessions_dir}/{item}"))
-                # Sort by modification time, newest first
-                candidates.sort(key=lambda x: x[0], reverse=True)
-                available_sessions = [c[1] for c in candidates]
-            
-            if available_sessions:
-                selected_session = st.selectbox("Select Session to Load", ["None"] + available_sessions)
-                # If session is present in URL params, show its ZIP download if available
-                # try:
-                #     params = st.query_params.to_dict()
-                #     url_session = params.get('session')
-                # except Exception:
-                #     url_session = None
-
-                # if url_session:
-                #     candidate_zip = os.path.join(url_session, 'session.zip')
-                #     if os.path.exists(candidate_zip):
-                #         try:
-                #             with open(candidate_zip, 'rb') as f:
-                #                 st.download_button(label="Download Session ZIP (from URL)", data=f.read(), file_name=os.path.basename(candidate_zip), mime="application/zip")
-                #         except Exception:
-                #             pass
-
-                # Also show download button for the selected session (if it contains session.zip)
-                if selected_session != "None":
-                    candidate_zip = f"{selected_session}/session.zip"
-                    if os.path.exists(candidate_zip):
-                        try:
-                            with open(candidate_zip, "rb") as f:
-                                st.download_button(label="Download Session ZIP", data=f.read(), file_name=os.path.basename(candidate_zip), mime="application/zip")
-                        except Exception:
-                            pass
-                if st.button("Load Session") and selected_session != "None":
-                    json_path = f"{selected_session}/session.json"
+        if target:
+            # If we've already loaded this session from the URL during this app run,
+            # skip re-loading to avoid a reload loop while keeping the param in the URL.
+            if st.session_state.get('loaded_session_from_url') == target:
+                # already loaded, do nothing
+                pass
+            else:
+                # Normalize path and ensure it points inside the sessions directory
+                target_path = os.path.normpath(target)
+                # Only allow loading from the sessions dir for safety
+                if target_path.startswith(sessions_dir) and os.path.isdir(target_path):
+                    json_path = os.path.join(target_path, 'session.json')
                     if os.path.exists(json_path):
                         with open(json_path, 'r') as f:
                             loaded_data = json.load(f)
-                        
+
                         st.session_state.conversation = loaded_data.get("turns", [])
                         st.session_state.current_turn = len(loaded_data.get("turns", []))
-                        st.session_state.style = loaded_data.get("style", "Photorealistic")
-                        
-                        # Restore images
+                        st.session_state.style = loaded_data.get("style", st.session_state.style)
+
+                        # Restore images referenced in the session (copy into workspace if present)
                         image_map = loaded_data.get("images", {})
                         for original_path, session_img_path in image_map.items():
-                            full_session_img = f"{selected_session}/{session_img_path}"
+                            full_session_img = os.path.join(target_path, session_img_path)
                             if os.path.exists(full_session_img):
                                 dest_path = original_path
-                                shutil.copy2(full_session_img, dest_path)
+                                try:
+                                    shutil.copy2(full_session_img, dest_path)
+                                except Exception:
+                                    pass
                                 for turn in st.session_state.conversation:
                                     if turn.get('image_path') == original_path:
                                         turn['image_path'] = dest_path
-                        # Update the URL so the loaded session can be shared/bookmarked.
-                        try:
-                            # Use the selected session path as the session query parameter.
-                            st.query_params['session']=selected_session
-                        except Exception:
-                            # If setting query params fails, fall back to success message and rerun.
-                            pass
 
-                        st.success(f"Session loaded! Continuing with {len(st.session_state.conversation)} turns.")
-                        # Rerun to reflect the loaded session and updated URL
+                        # Record that we've loaded this session from URL so we don't reload again
+                        st.session_state['loaded_session_from_url'] = target
+
+                        st.success(f"Session loaded from URL: {target}")
+                        # Rerun to reflect loaded session; because we've set loaded_session_from_url,
+                        # this will not re-trigger the load when the page re-executes, and the URL
+                        # param remains intact for sharing/bookmarking.
                         st.rerun()
-                    else:
-                        st.error(f"Session file not found: {json_path}")
-            else:
-                st.warning("No saved sessions found in the 'sessions' directory.")
+                else:
+                    st.error("Invalid or disallowed session path provided in URL parameter.")
+        available_sessions = []
+        if os.path.exists(sessions_dir):
+            candidates = []
+            for item in os.listdir(sessions_dir):
+                session_path = os.path.join(sessions_dir, item)
+                if os.path.isdir(session_path):
+                    json_path = os.path.join(session_path, "session.json")
+                    if os.path.exists(json_path):
+                        try:
+                            mtime = os.path.getmtime(session_path)
+                        except Exception:
+                            mtime = 0
+                        candidates.append((mtime, f"{sessions_dir}/{item}"))
+            # Sort by modification time, newest first
+            candidates.sort(key=lambda x: x[0], reverse=True)
+            available_sessions = [c[1] for c in candidates]
+        
+        if available_sessions:
+            selected_session = st.selectbox("Select Session to Load", ["None"] + available_sessions)
+
+            # Also show download button for the selected session (if it contains session.zip)
+            if selected_session != "None":
+                candidate_zip = f"{selected_session}/session.zip"
+                if os.path.exists(candidate_zip):
+                    try:
+                        with open(candidate_zip, "rb") as f:
+                            st.download_button(label="Download Session ZIP", data=f.read(), file_name=os.path.basename(candidate_zip), mime="application/zip")
+                    except Exception:
+                        pass
+            if st.button("Load Session") and selected_session != "None":
+                json_path = f"{selected_session}/session.json"
+                if os.path.exists(json_path):
+                    with open(json_path, 'r') as f:
+                        loaded_data = json.load(f)
+                    
+                    st.session_state.conversation = loaded_data.get("turns", [])
+                    st.session_state.current_turn = len(loaded_data.get("turns", []))
+                    st.session_state.style = loaded_data.get("style", "Photorealistic")
+                    
+                    # Restore images
+                    image_map = loaded_data.get("images", {})
+                    for original_path, session_img_path in image_map.items():
+                        full_session_img = f"{selected_session}/{session_img_path}"
+                        if os.path.exists(full_session_img):
+                            dest_path = original_path
+                            shutil.copy2(full_session_img, dest_path)
+                            for turn in st.session_state.conversation:
+                                if turn.get('image_path') == original_path:
+                                    turn['image_path'] = dest_path
+                    # Update the URL so the loaded session can be shared/bookmarked.
+                    try:
+                        # Use the selected session path as the session query parameter.
+                        st.query_params['session']=selected_session
+                    except Exception:
+                        # If setting query params fails, fall back to success message and rerun.
+                        pass
+
+                    st.success(f"Session loaded! Continuing with {len(st.session_state.conversation)} turns.")
+                    # Rerun to reflect the loaded session and updated URL
+                    st.rerun()
+                else:
+                    st.error(f"Session file not found: {json_path}")
+        else:
+            st.warning("No saved sessions found in the 'sessions' directory.")
 
             # Show current state
             if st.session_state.conversation:
