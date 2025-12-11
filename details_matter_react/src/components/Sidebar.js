@@ -16,7 +16,11 @@ const Sidebar = ({
   isLoading,
   error,
   success,
-  onClearMessages
+  onClearMessages,
+  onOpenGallery,
+  onPublishCloud,
+  onNewThread,
+  onAddToGallery
 }) => {
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [overrideKeyInput, setOverrideKeyInput] = useState('');
@@ -187,6 +191,41 @@ const Sidebar = ({
       {error && <div className="error">{error}</div>}
       {success && <div className="success">{success}</div>}
 
+      {/* Share / Gallery Section */}
+      {isApiKeySet && (
+        <div className="section">
+          <h3>🌐 Share & Gallery</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <button
+              className="danger-button"
+              onClick={onNewThread}
+              disabled={isLoading}
+            >
+              🧹 New Thread (Reset)
+            </button>
+            
+            <button className="primary-button" onClick={onOpenGallery} disabled={isLoading}>
+              📂 Open Gallery (Local & Cloud)
+            </button>
+
+            <button className="secondary-button" onClick={onAddToGallery} disabled={isLoading}>
+              💾 Save to Local Gallery
+            </button>
+
+            {conversation.length > 0 && (
+              <button 
+                className="secondary-button" 
+                onClick={onPublishCloud} 
+                disabled={isLoading}
+                title="Upload to Cloudflare R2 (Requires Config)"
+              >
+                ☁️ Publish to Cloud
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* AI Model Section */}
       {isApiKeySet && (
         <div className="section">
@@ -295,11 +334,7 @@ const Sidebar = ({
             <button
               className="primary-button"
               style={{ width: '100%', background: 'var(--error-bg)', color: 'var(--error-text)', border: '1px solid var(--error-text)', boxShadow: 'none' }}
-              onClick={() => {
-                if (window.confirm('Are you sure you want to reset? All progress will be lost unless exported.')) {
-                  window.location.reload();
-                }
-              }}
+              onClick={onNewThread}
             >
               Reset
             </button>

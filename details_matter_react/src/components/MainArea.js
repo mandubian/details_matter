@@ -18,38 +18,55 @@ const MainArea = ({
   setError,
   success,
   setSuccess,
-  onClearMessages
+  onClearMessages,
+  forkInfo,
+  threadId
 }) => {
   const [initialPrompt, setInitialPrompt] = useState('');
   const [uploadedFile, setUploadedFile] = useState(null);
   const inFlightRef = useRef(false); // UI-level single-flight guard
 
-  // Handle undo last turn
+  const undoLastTurn = () => {
+    if (conversation.length > 0) {
+      setConversation(prev => prev.slice(0, -1));
+      setCurrentTurn(prev => Math.max(0, prev - 1));
+      setSuccess('Last turn undone successfully!');
+      setTimeout(() => setSuccess(null), 3000);
+    }
+  };
+
+  // Handle undo last turn via event
   useEffect(() => {
-    const handleUndo = () => {
-      if (conversation.length > 0) {
-        const lastTurn = conversation[conversation.length - 1];
-
-        // Clean up blob URLs to prevent memory leaks
-        if (lastTurn.image) {
-          URL.revokeObjectURL(lastTurn.image);
-        }
-
-        setConversation(prev => prev.slice(0, -1));
-        setCurrentTurn(prev => Math.max(0, prev - 1));
-        setSuccess('Last turn undone successfully!');
-        setTimeout(() => setSuccess(null), 3000);
-      }
-    };
-
+    const handleUndo = () => undoLastTurn();
     window.addEventListener('undoLastTurn', handleUndo);
     return () => window.removeEventListener('undoLastTurn', handleUndo);
-  }, [conversation, setConversation, setCurrentTurn, setSuccess]);
+  }, [conversation]);
 
-  // Handle initial image upload
-  const handleFileUpload = (file) => {
-    setUploadedFile(file);
-    onInitialImageUpload(file);
+  const fileToDataURL = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Handle initial image upload (store as data URL so it survives reloads)
+  const handleFileUpload = async (file) => {
+    if (!file) {
+      setUploadedFile(null);
+      onInitialImageUpload(null);
+      return;
+    }
+    try {
+      const dataUrl = await fileToDataURL(file);
+      setUploadedFile(dataUrl); // keep as data URL
+      onInitialImageUpload(dataUrl);
+    } catch (err) {
+      console.error('Failed to read file as data URL', err);
+      setUploadedFile(null);
+      onInitialImageUpload(null);
+    }
   };
 
   // Handle starting the evolution
@@ -76,7 +93,7 @@ const MainArea = ({
         id: Date.now(),
         model_name: 'Human Input',
         text: initialPrompt,
-        image: uploadedFile ? URL.createObjectURL(uploadedFile) : null,
+        image: uploadedFile || null, // already data URL if provided
         image_description: uploadedFile ? "Initial uploaded image" : null,
         prompt: null,
         timestamp: new Date().toLocaleTimeString(),
@@ -223,11 +240,6 @@ const MainArea = ({
         console.log(`📊 Regeneration metrics: request ≈ ${kb(result.metrics.requestBytes)} KB` + (result.metrics.imageDecodedBytes ? ` | images (decoded) ≈ ${kb(result.metrics.imageDecodedBytes)} KB` : ''));
       }
 
-      // Clean up old blob URL
-      if (turnToRegenerate.image) {
-        URL.revokeObjectURL(turnToRegenerate.image);
-      }
-
       const updatedTurn = {
         ...turnToRegenerate,
         text: result.text,
@@ -279,6 +291,7 @@ const MainArea = ({
             conversation={conversation}
             onContinue={handleContinueEvolution}
             onRegenerateTurn={handleRegenerateTurn}
+            onUndoTurn={undoLastTurn}
             currentTurn={currentTurn}
             style={style}
             isLoading={isLoading}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const Turn = ({ turn, index, onRegenerate, isLoading, isApiKeySet }) => {
+const Turn = ({ turn, index, onRegenerate, onUndo, isLoading, isApiKeySet }) => {
   const [showRawResponse, setShowRawResponse] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
 
@@ -109,13 +109,20 @@ const Turn = ({ turn, index, onRegenerate, isLoading, isApiKeySet }) => {
       )}
 
       {turn.model_name !== 'Human Input' && (
-        <div className="turn-controls" style={{marginTop: '20px'}}>
+        <div className="turn-controls" style={{marginTop: '20px', display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
           <button
             className="secondary-button"
             onClick={onRegenerate}
             disabled={!isApiKeySet || isLoading}
           >
             🔄 Regenerate Turn
+          </button>
+          <button
+            className="secondary-button"
+            onClick={onUndo}
+            disabled={!isApiKeySet || isLoading}
+          >
+            ↩️ Undo Last Turn
           </button>
         </div>
       )}

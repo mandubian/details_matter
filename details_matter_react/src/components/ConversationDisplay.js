@@ -5,6 +5,7 @@ const ConversationDisplay = ({
   conversation,
   onContinue,
   onRegenerateTurn,
+  onUndoTurn,
   currentTurn,
   style,
   isLoading,
@@ -26,6 +27,7 @@ const ConversationDisplay = ({
             turn={turn}
             index={index}
             onRegenerate={() => onRegenerateTurn(index)}
+            onUndo={() => onUndoTurn(index)}
             isLoading={isLoading}
             isApiKeySet={isApiKeySet}
           />

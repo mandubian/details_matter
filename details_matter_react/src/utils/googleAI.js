@@ -253,22 +253,10 @@ const generateContentDirectRest = async (apiKey, prompt, context = "", previousI
       if (part.text) {
         text = (text || '') + part.text;
       } else if (part.inlineData) {
-        // Convert base64 data to blob URL
+        // Return as data URL so it persists across reloads (no object URL expiry)
         const imageData = part.inlineData.data;
         const mimeType = part.inlineData.mimeType;
-
-        try {
-          const byteCharacters = atob(imageData);
-          const byteNumbers = new Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-          }
-          const byteArray = new Uint8Array(byteNumbers);
-          const blob = new Blob([byteArray], { type: mimeType });
-          image = URL.createObjectURL(blob);
-        } catch (error) {
-          console.error('Error processing image data:', error);
-        }
+        image = `data:${mimeType};base64,${imageData}`;
       }
     }
   }
@@ -305,22 +293,9 @@ const generateContentDirectRest = async (apiKey, prompt, context = "", previousI
             if (part.inlineData) {
               const imageData = part.inlineData.data;
               const mimeType = part.inlineData.mimeType;
-
-              try {
-                const byteCharacters = atob(imageData);
-                const byteNumbers = new Array(byteCharacters.length);
-                for (let i = 0; i < byteCharacters.length; i++) {
-                  byteNumbers[i] = byteCharacters.charCodeAt(i);
-                }
-                const byteArray = new Uint8Array(byteNumbers);
-                const blob = new Blob([byteArray], { type: mimeType });
-                image = URL.createObjectURL(blob);
-                console.log('Fallback image generation succeeded');
-                break;
-              } catch (error) {
-                console.error('Error processing fallback image data:', error);
-                generationError = `Image processing failed: ${error.message}`;
-              }
+              image = `data:${mimeType};base64,${imageData}`;
+              console.log('Fallback image generation succeeded');
+              break;
             }
           }
         } else {
