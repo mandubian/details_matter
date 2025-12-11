@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { getCurrentApiKey } from '../utils/googleAI';
+import React, { useState, useEffect } from 'react';
+import { AVAILABLE_MODELS, fetchAvailableModels } from '../utils/googleAI';
 
 const Sidebar = ({
   apiKey,
@@ -10,6 +10,8 @@ const Sidebar = ({
   currentTurn,
   style,
   onStyleChange,
+  model,
+  onModelChange,
   onContinue,
   isLoading,
   error,
@@ -19,6 +21,27 @@ const Sidebar = ({
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [overrideKeyInput, setOverrideKeyInput] = useState('');
   const [showOverride, setShowOverride] = useState(false);
+  const [availableModels, setAvailableModels] = useState(AVAILABLE_MODELS);
+  const [loadingModels, setLoadingModels] = useState(false);
+
+  // Fetch available models when API key changes
+  useEffect(() => {
+    const loadModels = async () => {
+      if (isApiKeySet && apiKey) {
+        setLoadingModels(true);
+        const fetchedModels = await fetchAvailableModels(apiKey);
+        if (fetchedModels.length > 0) {
+          console.log('Using fetched models from API:', fetchedModels);
+          setAvailableModels(fetchedModels);
+          // Always set to the first model (Banana appears first if available)
+          // This ensures Banana is auto-selected when the user's key supports it
+          onModelChange(fetchedModels[0].id);
+        }
+        setLoadingModels(false);
+      }
+    };
+    loadModels();
+  }, [isApiKeySet, apiKey]); // Removed model from deps to avoid loop
 
   const handleApiKeySubmit = (e) => {
     e.preventDefault();
@@ -31,12 +54,11 @@ const Sidebar = ({
 
   const handleOverrideSubmit = (e) => {
     e.preventDefault();
-    console.log('🔄 Sidebar: Override form submitted with key:', overrideKeyInput.substring(0, 8) + '...');
+    console.log('🔄 Sidebar: Override form submitted');
     onApiKeyOverride(overrideKeyInput);
     setOverrideKeyInput('');
     setShowOverride(false);
     onClearMessages();
-    console.log('🔄 Sidebar: Override form processed');
   };
 
   const styles = [
@@ -46,63 +68,112 @@ const Sidebar = ({
     'Pop Art', 'Cubist', 'Art Nouveau'
   ];
 
+  // Export functionality
+  const handleExport = () => {
+    const data = {
+      conversation,
+      style,
+      exportDate: new Date().toISOString(),
+      appVersion: "1.0"
+    };
+    
+    // Convert to JSON string
+    const jsonString = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    // Trigger download
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `details-matter-session-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Import functionality
+  const handleImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const importedData = JSON.parse(event.target.result);
+        
+        // Dispatch custom event to update parent state (simplest way without prop drilling setConversation)
+        const customEvent = new CustomEvent('importSession', { detail: importedData });
+        window.dispatchEvent(customEvent);
+        
+        // Reset file input
+        e.target.value = '';
+      } catch (err) {
+        console.error("Failed to parse imported file", err);
+        alert("Invalid session file. Please upload a valid JSON export.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div className="sidebar">
-      <h2>⚙️ Configuration</h2>
+      <h2>⚙️ Settings</h2>
 
       {/* API Key Section */}
       <div className="section">
-        <h3>API Key Setup</h3>
+        <h3>API Key</h3>
 
         {!isApiKeySet ? (
           <>
             <div className="warning">
-              <strong>Security Notice:</strong> Use a throwaway/dev key. Never use a production key.
-              Keys are stored only in your browser's localStorage.
+              <strong>Security Notice:</strong> Keys are stored locally in your browser only.
             </div>
 
             <form onSubmit={handleApiKeySubmit}>
               <input
                 type="password"
-                placeholder="Gemini API Key"
+                placeholder="Paste Gemini API Key"
                 value={apiKeyInput}
                 onChange={(e) => setApiKeyInput(e.target.value)}
                 required
               />
-              <button type="submit">Set API Key</button>
+              <button type="submit" className="primary-button" style={{ width: '100%' }}>Set Key</button>
             </form>
           </>
         ) : (
           <>
             <div className="success">
-              API key is set and stored in browser localStorage.
-              <br />
-              <small style={{ color: '#065f46', fontSize: '12px' }}>
-                Current key: {getCurrentApiKey() ? getCurrentApiKey().substring(0, 12) + '...' : 'None'}
-              </small>
+              ✅ API Key Active
             </div>
 
             {!showOverride ? (
-              <button onClick={() => setShowOverride(true)}>
-                🔄 Override API Key
+              <button 
+                onClick={() => setShowOverride(true)} 
+                className="secondary-button" 
+                style={{ width: '100%', justifyContent: 'center' }}
+              >
+                Change API Key
               </button>
             ) : (
-              <form onSubmit={handleOverrideSubmit}>
+              <form onSubmit={handleOverrideSubmit} style={{ marginTop: '12px' }}>
                 <input
                   type="password"
-                  placeholder="New Gemini API Key"
+                  placeholder="New API Key"
                   value={overrideKeyInput}
                   onChange={(e) => setOverrideKeyInput(e.target.value)}
                   required
+                  style={{ marginBottom: '8px' }}
                 />
-                <button type="submit">Override Key</button>
+                <button type="submit" className="primary-button" style={{ width: '100%', marginBottom: '8px' }}>Update Key</button>
                 <button
                   type="button"
                   onClick={() => {
                     setShowOverride(false);
                     setOverrideKeyInput('');
                   }}
-                  style={{ backgroundColor: '#6b7280', marginTop: '5px' }}
+                  className="secondary-button"
+                  style={{ width: '100%', justifyContent: 'center' }}
                 >
                   Cancel
                 </button>
@@ -113,35 +184,37 @@ const Sidebar = ({
       </div>
 
       {/* Messages */}
-      {error && (
-        <div className="error">
-          {error}
-        </div>
-      )}
+      {error && <div className="error">{error}</div>}
+      {success && <div className="success">{success}</div>}
 
-      {success && (
-        <div className="success">
-          {success}
-        </div>
-      )}
-
-      {/* Continue Section */}
-      {isApiKeySet && conversation.length > 0 && (
+      {/* AI Model Section */}
+      {isApiKeySet && (
         <div className="section">
-          <h3>🎬 Continue Evolution</h3>
-          <button
-            onClick={onContinue}
-            disabled={isLoading}
+          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+            <h3>🧠 AI Model</h3>
+            {loadingModels && <span className="loading" style={{fontSize: '0.75rem'}}>Fetching...</span>}
+          </div>
+          <select
+            value={model}
+            onChange={(e) => onModelChange(e.target.value)}
+            disabled={loadingModels}
           >
-            {isLoading ? 'Generating...' : 'Continue Next Turn'}
-          </button>
+            {availableModels.map(modelOption => (
+              <option key={modelOption.id} value={modelOption.id}>
+                {modelOption.name}
+              </option>
+            ))}
+          </select>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '6px' }}>
+            {availableModels.length > 3 ? 'Models loaded from your API key.' : 'Flash is faster/cheaper. Pro is higher quality.'}
+          </div>
         </div>
       )}
 
       {/* Art Style Section */}
       {isApiKeySet && (
         <div className="section">
-          <h3>🎨 Art Style</h3>
+          <h3>🎨 Style</h3>
           <select
             value={style}
             onChange={(e) => onStyleChange(e.target.value)}
@@ -155,18 +228,60 @@ const Sidebar = ({
         </div>
       )}
 
+      {/* Storage & Sharing */}
+      {conversation.length > 0 && (
+        <div className="section">
+          <h3>💾 Save / Load</h3>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <button 
+              onClick={handleExport} 
+              className="primary-button"
+              style={{ background: 'var(--success-bg)', color: 'var(--success-text)', border: '1px solid var(--success-text)' }}
+            >
+              📥 Export Session (JSON)
+            </button>
+            
+            <div style={{ position: 'relative' }}>
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleImport}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  opacity: 0,
+                  width: '100%',
+                  height: '100%',
+                  cursor: 'pointer'
+                }}
+              />
+              <button 
+                className="primary-button"
+                style={{ width: '100%', pointerEvents: 'none', background: 'var(--background-color)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+              >
+                📤 Import Session
+              </button>
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+              Share the JSON file to let others fork your thread.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Stats */}
       {conversation.length > 0 && (
         <div className="section">
-          <h3>📊 Current Status</h3>
+          <h3>📊 Stats</h3>
           <div className="stats">
             <div className="stat">
               <div className="stat-value">{currentTurn}</div>
-              <div className="stat-label">Current Turn</div>
+              <div className="stat-label">Turns</div>
             </div>
             <div className="stat">
               <div className="stat-value">{conversation.length}</div>
-              <div className="stat-label">Total Turns</div>
+              <div className="stat-label">Total</div>
             </div>
           </div>
         </div>
@@ -175,26 +290,31 @@ const Sidebar = ({
       {/* Controls */}
       {conversation.length > 0 && (
         <div className="section">
-          <h3>🔄 Controls</h3>
+          <h3>Controls</h3>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <button
-              onClick={() => window.location.reload()}
-              style={{ backgroundColor: '#dc2626' }}
+              className="primary-button"
+              style={{ width: '100%', background: 'var(--error-bg)', color: 'var(--error-text)', border: '1px solid var(--error-text)', boxShadow: 'none' }}
+              onClick={() => {
+                if (window.confirm('Are you sure you want to reset? All progress will be lost unless exported.')) {
+                  window.location.reload();
+                }
+              }}
             >
-              🔄 Reset Evolution
+              Reset
             </button>
             <button
+              className="secondary-button"
+              style={{ width: '100%', justifyContent: 'center' }}
               onClick={() => {
                 if (conversation.length > 0) {
-                  // This will be handled by the parent component
                   const event = new CustomEvent('undoLastTurn');
                   window.dispatchEvent(event);
                 }
               }}
               disabled={conversation.length === 0}
-              style={{ backgroundColor: '#ea580c' }}
             >
-              ⬅️ Undo Last Turn
+              Undo
             </button>
           </div>
         </div>

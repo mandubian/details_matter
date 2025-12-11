@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 
 const Turn = ({ turn, index, onRegenerate, isLoading, isApiKeySet }) => {
   const [showRawResponse, setShowRawResponse] = useState(false);
+  const [isZoomed, setIsZoomed] = useState(false);
 
   // Extract first sentence for bold display
   const getFirstSentence = (text) => {
@@ -35,63 +36,86 @@ const Turn = ({ turn, index, onRegenerate, isLoading, isApiKeySet }) => {
       )}
 
       {turn.image ? (
-        <img
-          src={turn.image}
-          alt={turn.image_description || `Generated image for turn ${index}`}
-          className="turn-image"
-        />
-      ) : (
-        <div style={{
-          padding: '20px',
-          backgroundColor: '#fef3c7',
-          border: '1px solid #f59e0b',
-          borderRadius: '8px',
-          color: '#92400e'
-        }}>
-          <strong>No image was generated for this turn.</strong>
-          {turn.error && (
-            <div style={{ marginTop: '10px' }}>
-              <strong>Error:</strong> {turn.error}
-              <br />
-              <button
-                onClick={() => setShowRawResponse(!showRawResponse)}
-                style={{
-                  marginTop: '10px',
-                  padding: '5px 10px',
-                  backgroundColor: '#6b7280',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '4px',
-                  cursor: 'pointer'
-                }}
-              >
-                {showRawResponse ? 'Hide' : 'Show'} Raw Response
-              </button>
-              {showRawResponse && turn.rawResponse && (
-                <pre style={{
-                  marginTop: '10px',
-                  padding: '10px',
-                  backgroundColor: '#f3f4f6',
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                  overflow: 'auto',
-                  maxHeight: '200px'
-                }}>
-                  {JSON.stringify(turn.rawResponse, null, 2)}
-                </pre>
-              )}
+        <>
+          <img
+            src={turn.image}
+            alt={turn.image_description || `Generated image for turn ${index}`}
+            className="turn-image"
+            onClick={() => setIsZoomed(true)}
+          />
+          {isZoomed && (
+            <div className="image-modal" onClick={() => setIsZoomed(false)}>
+              <img
+                src={turn.image}
+                alt={`Zoomed turn ${index}`}
+                onClick={(e) => e.stopPropagation()} 
+              />
             </div>
           )}
-        </div>
+        </>
+      ) : (
+        // Only show error for AI turns, or if there's an explicit error on human turn (unlikely)
+        (turn.model_name !== 'Human Input' || turn.error) && (
+          <div className="error">
+            <div>
+              <strong>⚠️ No image generated</strong>
+              <p style={{ margin: '8px 0 0 0', fontSize: '0.9rem', color: 'inherit' }}>
+                {turn.error ? turn.error : "The model generated text but failed to produce an image."}
+              </p>
+              
+              {/* Debug Info for User */}
+              <div style={{ marginTop: '15px', fontSize: '0.8rem', opacity: 0.8 }}>
+                 <details open>
+                   <summary style={{cursor: 'pointer', fontWeight: 'bold'}}>Debug Details</summary>
+                   <pre style={{whiteSpace: 'pre-wrap', marginTop: '5px', background: 'rgba(0,0,0,0.1)', padding: '10px', borderRadius: '4px'}}>
+                     {JSON.stringify({
+                       hasText: !!turn.text,
+                       hasImage: !!turn.image,
+                       error: turn.error,
+                       turnIndex: index,
+                       model: turn.model_name
+                     }, null, 2)}
+                   </pre>
+                 </details>
+              </div>
+
+              {turn.error && (
+                <div style={{ marginTop: '10px' }}>
+                  <button
+                    className="secondary-button"
+                    onClick={() => setShowRawResponse(!showRawResponse)}
+                    style={{ fontSize: '0.8rem', padding: '4px 8px' }}
+                  >
+                    {showRawResponse ? 'Hide' : 'Show'} Raw Response
+                  </button>
+                  {showRawResponse && turn.rawResponse && (
+                    <pre style={{
+                      marginTop: '10px',
+                      padding: '10px',
+                      backgroundColor: 'rgba(0,0,0,0.1)',
+                      borderRadius: '4px',
+                      fontSize: '11px',
+                      overflow: 'auto',
+                      maxHeight: '200px'
+                    }}>
+                      {JSON.stringify(turn.rawResponse, null, 2)}
+                    </pre>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )
       )}
 
       {turn.model_name !== 'Human Input' && (
-        <div className="turn-controls">
+        <div className="turn-controls" style={{marginTop: '20px'}}>
           <button
+            className="secondary-button"
             onClick={onRegenerate}
             disabled={!isApiKeySet || isLoading}
           >
-            🔁 Regenerate
+            🔄 Regenerate Turn
           </button>
         </div>
       )}

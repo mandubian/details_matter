@@ -20,3 +20,5 @@ images/generated_*
 # React app artifacts
 details_matter_react/node_modules/
 details_matter_react/build/
+details_matter_react/node_modules/.cache/
+details_matter_react/.eslintcache

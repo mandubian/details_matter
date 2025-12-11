@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Turn from './Turn';
 
 const ConversationDisplay = ({
@@ -10,49 +10,15 @@ const ConversationDisplay = ({
   isLoading,
   isApiKeySet
 }) => {
-  const totalImages = conversation.filter(turn => turn.image).length;
+  const [guidance, setGuidance] = useState('');
+
+  const handleContinue = () => {
+    onContinue(guidance);
+    setGuidance(''); // Clear after sending
+  };
 
   return (
     <div>
-      <div className="controls-section">
-        <h2>🎬 Look for more Details</h2>
-
-        <div className="controls-grid">
-          <button
-            onClick={onContinue}
-            disabled={!isApiKeySet || isLoading}
-          >
-            {isLoading ? (
-              <span className="loading">
-                <span className="spinner"></span>
-                Generating...
-              </span>
-            ) : (
-              'Continue Next Turn'
-            )}
-          </button>
-
-          <select value={style} disabled>
-            <option value={style}>{style}</option>
-          </select>
-        </div>
-
-        <div className="stats">
-          <div className="stat">
-            <div className="stat-value">{currentTurn}</div>
-            <div className="stat-label">Current Turn</div>
-          </div>
-          <div className="stat">
-            <div className="stat-value">{conversation.length}</div>
-            <div className="stat-label">Total Turns</div>
-          </div>
-          <div className="stat">
-            <div className="stat-value">{totalImages}</div>
-            <div className="stat-label">Images Generated</div>
-          </div>
-        </div>
-      </div>
-
       <div className="conversation">
         {conversation.map((turn, index) => (
           <Turn
@@ -66,15 +32,53 @@ const ConversationDisplay = ({
         ))}
 
         {conversation.length > 0 && (
-          <div style={{
-            textAlign: 'center',
-            padding: '20px',
-            backgroundColor: '#f9fafb',
-            borderRadius: '8px',
-            marginTop: '20px'
-          }}>
-            <p style={{ margin: 0, color: '#6b7280' }}>
-              <strong>🎯 Next: Evolve from Turn {currentTurn - 1} | Style: {style}</strong>
+          <div style={{ marginTop: '40px', textAlign: 'center', paddingBottom: '40px' }}>
+            
+            {/* Director Mode Input */}
+            <div style={{ maxWidth: '500px', margin: '0 auto 20px', textAlign: 'left' }}>
+              <label style={{ display: 'block', marginBottom: '8px', fontWeight: '600', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+                🎬 Director Mode (Optional)
+              </label>
+              <input
+                type="text"
+                placeholder="Steer the story... (e.g., 'Suddenly, it starts raining')"
+                value={guidance}
+                onChange={(e) => setGuidance(e.target.value)}
+                disabled={isLoading}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !isLoading && isApiKeySet) {
+                    handleContinue();
+                  }
+                }}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-color)',
+                  backgroundColor: 'var(--background-color)',
+                  color: 'var(--text-primary)',
+                  marginBottom: '8px'
+                }}
+              />
+            </div>
+
+            <button
+              className="primary-button"
+              style={{ padding: '14px 32px', fontSize: '1.05rem' }}
+              onClick={handleContinue}
+              disabled={!isApiKeySet || isLoading}
+            >
+              {isLoading ? (
+                 <span className="loading" style={{color: 'white'}}>
+                   <span className="spinner" style={{borderColor: 'white', borderTopColor: 'transparent'}}></span>
+                   Generating...
+                 </span>
+              ) : (
+                <>{guidance ? '🎬 Continue with Guidance' : '🎬 Continue Next Turn'}</>
+              )}
+            </button>
+            <p style={{ marginTop: '16px', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+              Next: Evolve from Turn {currentTurn - 1} | Style: {style}
             </p>
           </div>
         )}

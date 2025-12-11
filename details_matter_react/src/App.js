@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import './App.css';
 import Sidebar from './components/Sidebar';
 import MainArea from './components/MainArea';
-import { initializeGoogleAI } from './utils/googleAI';
+import { initializeGoogleAI, AVAILABLE_MODELS } from './utils/googleAI';
 
 function App() {
   // State management
@@ -11,6 +10,7 @@ function App() {
   const [conversation, setConversation] = useState([]);
   const [currentTurn, setCurrentTurn] = useState(0);
   const [style, setStyle] = useState('Photorealistic');
+  const [model, setModel] = useState('gemini-2.5-flash'); // will be adjusted if banana found
   const [initialImage, setInitialImage] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -22,6 +22,7 @@ function App() {
     const savedConversation = localStorage.getItem('details_matter_conversation');
     const savedCurrentTurn = localStorage.getItem('details_matter_current_turn');
     const savedStyle = localStorage.getItem('details_matter_style');
+    const savedModel = localStorage.getItem('details_matter_model');
 
     if (savedApiKey) {
       setApiKey(savedApiKey);
@@ -48,6 +49,36 @@ function App() {
     if (savedStyle) {
       setStyle(savedStyle);
     }
+    
+    if (savedModel) {
+      const allowed = AVAILABLE_MODELS.some(m => m.id === savedModel);
+      setModel(allowed ? savedModel : 'gemini-2.5-flash');
+    }
+    
+    // Listen for session imports
+    const handleImportSession = (event) => {
+      const { conversation: newConversation, style: newStyle } = event.detail;
+      
+      if (newConversation) {
+        setConversation(newConversation);
+        // Recalculate turn based on conversation length
+        setCurrentTurn(newConversation.length);
+      }
+      
+      if (newStyle) {
+        setStyle(newStyle);
+      }
+      
+      setSuccess('Session imported successfully!');
+      setTimeout(() => setSuccess(null), 3000);
+    };
+
+    window.addEventListener('importSession', handleImportSession);
+
+    // Cleanup
+    return () => {
+      window.removeEventListener('importSession', handleImportSession);
+    };
   }, []);
 
   // Save state to localStorage whenever it changes
@@ -68,6 +99,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem('details_matter_style', style);
   }, [style]);
+
+  useEffect(() => {
+    localStorage.setItem('details_matter_model', model);
+  }, [model]);
 
   // Handle API key setting
   const handleApiKeySet = (newApiKey) => {
@@ -105,6 +140,11 @@ function App() {
     setStyle(newStyle);
   };
 
+  // Handle model change
+  const handleModelChange = (newModel) => {
+    setModel(newModel);
+  };
+
   // Handle initial image upload
   const handleInitialImageUpload = (file) => {
     if (file) {
@@ -130,11 +170,7 @@ function App() {
         <h1>🎨 Only Details Matter</h1>
         <p>
           Iteratively test how a generative model latches onto a single visual detail in an image
-          and reimagines it inside entirely new scenes of its creation.
-        </p>
-        <p>
-          Each turn: the model picks one salient detail from the previous image (a shape, object, texture, motif)
-          and invents a different context that preserves only that detail's recognizable identity.
+          and reimagines it inside entirely new scenes of its creation. (Cinematic Update)
         </p>
       </header>
 
@@ -148,7 +184,9 @@ function App() {
           currentTurn={currentTurn}
           style={style}
           onStyleChange={handleStyleChange}
-          onContinue={null} // Will be implemented in MainArea
+          model={model}
+          onModelChange={handleModelChange}
+          onContinue={null}
           isLoading={isLoading}
           error={error}
           success={success}
@@ -161,6 +199,7 @@ function App() {
           currentTurn={currentTurn}
           setCurrentTurn={setCurrentTurn}
           style={style}
+          model={model}
           initialImage={initialImage}
           onInitialImageUpload={handleInitialImageUpload}
           isApiKeySet={isApiKeySet}
