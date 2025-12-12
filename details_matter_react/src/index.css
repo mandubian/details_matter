@@ -521,16 +521,13 @@ option {
     flex-direction: column;
   }
 
-  .sidebar {
-    order: 2;
-    position: static;
-    margin-top: 40px;
-    border-top: 1px solid var(--border-color);
-    padding-top: 40px;
-    background: transparent;
-    border: none;
-    box-shadow: none;
-    backdrop-filter: none;
+  /* Sidebar becomes a modal sheet on mobile (rendered separately).
+     IMPORTANT: Don't hide the sidebar when it's rendered inside the Settings bottom-sheet. */
+  .main-content > .sidebar {
+    display: none;
+  }
+  .dm-sheet .sidebar {
+    display: block;
   }
 
   /* Sticky Bottom Nav for Controls could be an option, but for now simple layout */

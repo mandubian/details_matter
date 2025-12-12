@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
 import MainArea from './components/MainArea';
 import Gallery from './components/Gallery';
+import SettingsSheet from './components/SettingsSheet';
 import { initializeGoogleAI, AVAILABLE_MODELS } from './utils/googleAI';
 import { uploadThread, fetchThread } from './services/cloudService';
 import { compressConversation } from './utils/imageUtils';
@@ -67,7 +68,13 @@ function App() {
   const [threadId, setThreadId] = useState(initialState.threadId);
   const [gallery, setGallery] = useState(initialState.gallery);
   const [forkInfo, setForkInfo] = useState(initialState.forkInfo);
-  const [showGallery, setShowGallery] = useState(false);
+  // Default to gallery view if no active conversation or if specifically requested
+  // Gallery-first: always land on the gallery.
+  // We'll show a "Resume last session" card there if conversation exists.
+  const [view, setView] = useState('gallery');
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia?.('(max-width: 768px)')?.matches ?? false);
+  const [showSettings, setShowSettings] = useState(false);
+  
   const MAX_GALLERY_ITEMS = 20;
 
   // Initialize Google AI if API key was loaded
@@ -109,6 +116,16 @@ function App() {
     return () => {
       window.removeEventListener('importSession', handleImportSession);
     };
+  }, []);
+
+  // Track mobile breakpoint for editor layout
+  useEffect(() => {
+    const mq = window.matchMedia?.('(max-width: 768px)');
+    if (!mq) return;
+    const handler = () => setIsMobile(!!mq.matches);
+    handler();
+    mq.addEventListener?.('change', handler);
+    return () => mq.removeEventListener?.('change', handler);
   }, []);
 
   // Save state to localStorage whenever it changes
@@ -288,7 +305,7 @@ function App() {
     }
   };
 
-  const handleSelectThread = async (entry, isCloud = false) => {
+  const handleOpenThread = async (entry, isCloud = false) => {
     try {
       let data = entry;
       if (isCloud) {
@@ -305,7 +322,7 @@ function App() {
         setThreadId(data.threadId || `thread-${Date.now()}`);
         setForkInfo(data.forkInfo || null);
         
-        setShowGallery(false);
+        setView('editor');
         setSuccess('Thread loaded successfully.');
         setTimeout(() => setSuccess(null), 3000);
       }
@@ -316,65 +333,164 @@ function App() {
     }
   };
 
-  const handleImportCloudThread = (id) => {
-    handleSelectThread({ id }, true);
+  const handleForkThread = async (entry, isCloud = false) => {
+    try {
+      let data = entry;
+      if (isCloud) {
+        setIsLoading(true);
+        data = await fetchThread(entry.id);
+        setIsLoading(false);
+      }
+
+      if (data.conversation) {
+        const parentId = data.threadId || data.id;
+        const parentTurn = Math.max(0, data.conversation.length - 1);
+        const parentImage = data.conversation[parentTurn]?.image || null;
+
+        setConversation(data.conversation);
+        setCurrentTurn(data.conversation.length);
+        setStyle(data.style || style);
+        setModel(data.model || model);
+        setThreadId(`thread-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`);
+        setForkInfo({ parentId, parentTurn, parentImage });
+
+        setView('editor');
+        setSuccess('Fork created. You can now continue from this thread.');
+        setTimeout(() => setSuccess(null), 3000);
+      }
+    } catch (err) {
+      console.error('Fork failed:', err);
+      setError('Failed to fork thread.');
+      setIsLoading(false);
+    }
+  };
+
+  const handleForkFromTurn = (turnIndex) => {
+    if (!conversation || conversation.length === 0) return;
+    const parentId = threadId;
+    const idx = Math.max(0, Math.min(turnIndex, conversation.length - 1));
+
+    // Prefer image at chosen turn; fall back to nearest previous image
+    let parentImage = conversation[idx]?.image || null;
+    if (!parentImage) {
+      for (let i = idx; i >= 0; i--) {
+        if (conversation[i]?.image) {
+          parentImage = conversation[i].image;
+          break;
+        }
+      }
+    }
+
+    const newConversation = conversation.slice(0, idx + 1);
+    const newThreadId = `thread-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+
+    setConversation(newConversation);
+    setCurrentTurn(newConversation.length);
+    setThreadId(newThreadId);
+    setForkInfo({ parentId, parentTurn: idx, parentImage });
+    setView('editor');
+
+    setSuccess(`Fork created from turn ${idx}. You can now continue from this branch.`);
+    setTimeout(() => setSuccess(null), 3000);
   };
 
   const handleNewThread = () => {
-    if (window.confirm('Start a new thread? This will clear the current conversation.')) {
-      // Clear persistence keys
-      localStorage.removeItem('details_matter_conversation');
-      localStorage.removeItem('details_matter_current_turn');
-      localStorage.removeItem('details_matter_thread_id');
-      localStorage.removeItem('details_matter_fork_info');
-      
-      // Reload to reset state cleanly
-      window.location.reload();
+    // If we are already in editor with content, confirm
+    if (conversation.length > 0) {
+      if (!window.confirm('Start a new thread? Unsaved progress will be lost.')) return;
     }
+    
+    // Reset state but don't necessarily reload page if we handle state cleanly
+    setConversation([]);
+    setCurrentTurn(0);
+    setThreadId(`thread-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`);
+    setForkInfo(null);
+    setInitialImage(null);
+    
+    // Clear persistence keys
+    localStorage.removeItem('details_matter_conversation');
+    localStorage.removeItem('details_matter_current_turn');
+    localStorage.removeItem('details_matter_thread_id');
+    localStorage.removeItem('details_matter_fork_info');
+    
+    setView('editor');
+  };
+
+  // True full-bleed gallery: do NOT render under `.app` which is max-width constrained.
+  if (view === 'gallery') {
+    return (
+      <Gallery
+        localGallery={gallery}
+        // "Resume" card comes from current in-memory (possibly persisted) session
+        currentSession={{
+          threadId,
+          conversation,
+          style,
+          model,
+          forkInfo,
+          timestamp: new Date().toISOString(),
+        }}
+        isLoading={isLoading}
+        onNewThread={handleNewThread}
+        onOpenThread={(t, isCloud) => handleOpenThread(t, isCloud)}
+        onForkThread={(t, isCloud) => handleForkThread(t, isCloud)}
+      />
+    );
+  }
+
+  const sidebarProps = {
+    apiKey,
+    isApiKeySet,
+    onApiKeySet: handleApiKeySet,
+    onApiKeyOverride: handleApiKeyOverride,
+    conversation,
+    currentTurn,
+    style,
+    onStyleChange: handleStyleChange,
+    model,
+    onModelChange: handleModelChange,
+    onContinue: null,
+    isLoading,
+    error,
+    success,
+    onClearMessages: clearMessages,
+    onOpenGallery: () => setView('gallery'),
+    onPublishCloud: handlePublishCloud,
+    onAddToGallery: handleAddToGallery,
+    gallery,
+    onNewThread: handleNewThread,
   };
 
   return (
     <div className="app">
-      <header className="header">
-        <h1>🎨 Only Details Matter</h1>
-        <p>
-          Iteratively test how a generative model latches onto a single visual detail in an image
-          and reimagines it inside entirely new scenes of its creation. (Cinematic Update)
-        </p>
+      <header className="header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px' }}>
+        <div>
+          <h1>🎨 Only Details Matter</h1>
+          <p style={{ display: 'none' }}>
+            Iteratively test how a generative model latches onto a single visual detail.
+          </p>
+        </div>
+        <button
+          className="secondary-button"
+          onClick={() => setView('gallery')}
+          style={{ marginLeft: '20px' }}
+        >
+          🏠 Home / Gallery
+        </button>
+
+        {isMobile && (
+          <button
+            className="primary-button"
+            onClick={() => setShowSettings(true)}
+            style={{ marginLeft: '10px' }}
+          >
+            ⚙️ Settings
+          </button>
+        )}
       </header>
 
       <div className="main-content">
-        <Sidebar
-          apiKey={apiKey}
-          isApiKeySet={isApiKeySet}
-          onApiKeySet={handleApiKeySet}
-          onApiKeyOverride={handleApiKeyOverride}
-          conversation={conversation}
-          currentTurn={currentTurn}
-          style={style}
-          onStyleChange={handleStyleChange}
-          model={model}
-          onModelChange={handleModelChange}
-          onContinue={null}
-          isLoading={isLoading}
-          error={error}
-          success={success}
-          onClearMessages={clearMessages}
-          onOpenGallery={() => setShowGallery(true)}
-          onPublishCloud={handlePublishCloud}
-          onAddToGallery={handleAddToGallery}
-          gallery={gallery}
-          onNewThread={handleNewThread}
-        />
-
-        {showGallery && (
-          <Gallery 
-            localGallery={gallery} 
-            onSelectThread={(t) => handleSelectThread(t, false)}
-            onImportCloudThread={handleImportCloudThread}
-            onClose={() => setShowGallery(false)}
-          />
-        )}
+        {!isMobile && <Sidebar {...sidebarProps} />}
 
         <MainArea
           conversation={conversation}
@@ -395,8 +511,21 @@ function App() {
           onClearMessages={clearMessages}
           forkInfo={forkInfo}
           threadId={threadId}
+          onForkFromTurn={handleForkFromTurn}
         />
       </div>
+
+      {isMobile && (
+        <SettingsSheet open={showSettings} title="Settings" onClose={() => setShowSettings(false)}>
+          <Sidebar
+            {...sidebarProps}
+            onOpenGallery={() => {
+              setShowSettings(false);
+              setView('gallery');
+            }}
+          />
+        </SettingsSheet>
+      )}
     </div>
   );
 }

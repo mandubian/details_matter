@@ -37,14 +37,16 @@ const Sidebar = ({
         if (fetchedModels.length > 0) {
           console.log('Using fetched models from API:', fetchedModels);
           setAvailableModels(fetchedModels);
-          // Always set to the first model (Banana appears first if available)
-          // This ensures Banana is auto-selected when the user's key supports it
-          onModelChange(fetchedModels[0].id);
+          // Keep current selection if still available; otherwise fall back to first.
+          const stillValid = !!fetchedModels.find(m => m.id === model);
+          if (!stillValid) onModelChange(fetchedModels[0].id);
         }
         setLoadingModels(false);
       }
     };
     loadModels();
+    // We intentionally don't include onModelChange/model in deps to avoid loops.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isApiKeySet, apiKey]); // Removed model from deps to avoid loop
 
   const handleApiKeySubmit = (e) => {

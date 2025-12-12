@@ -20,53 +20,39 @@ const MainArea = ({
   setSuccess,
   onClearMessages,
   forkInfo,
-  threadId
+  threadId,
+  onForkFromTurn
 }) => {
   const [initialPrompt, setInitialPrompt] = useState('');
   const [uploadedFile, setUploadedFile] = useState(null);
   const inFlightRef = useRef(false); // UI-level single-flight guard
 
-  const undoLastTurn = () => {
-    if (conversation.length > 0) {
-      setConversation(prev => prev.slice(0, -1));
-      setCurrentTurn(prev => Math.max(0, prev - 1));
-      setSuccess('Last turn undone successfully!');
-      setTimeout(() => setSuccess(null), 3000);
-    }
-  };
-
-  // Handle undo last turn via event
+  // Handle undo last turn
   useEffect(() => {
-    const handleUndo = () => undoLastTurn();
+    const handleUndo = () => {
+      if (conversation.length > 0) {
+        const lastTurn = conversation[conversation.length - 1];
+
+        // Clean up blob URLs to prevent memory leaks (images are usually data: URLs now)
+        if (lastTurn.image && typeof lastTurn.image === 'string' && lastTurn.image.startsWith('blob:')) {
+          URL.revokeObjectURL(lastTurn.image);
+        }
+
+        setConversation(prev => prev.slice(0, -1));
+        setCurrentTurn(prev => Math.max(0, prev - 1));
+        setSuccess('Last turn undone successfully!');
+        setTimeout(() => setSuccess(null), 3000);
+      }
+    };
+
     window.addEventListener('undoLastTurn', handleUndo);
     return () => window.removeEventListener('undoLastTurn', handleUndo);
-  }, [conversation]);
+  }, [conversation, setConversation, setCurrentTurn, setSuccess]);
 
-  const fileToDataURL = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target.result);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  };
-
-  // Handle initial image upload (store as data URL so it survives reloads)
-  const handleFileUpload = async (file) => {
-    if (!file) {
-      setUploadedFile(null);
-      onInitialImageUpload(null);
-      return;
-    }
-    try {
-      const dataUrl = await fileToDataURL(file);
-      setUploadedFile(dataUrl); // keep as data URL
-      onInitialImageUpload(dataUrl);
-    } catch (err) {
-      console.error('Failed to read file as data URL', err);
-      setUploadedFile(null);
-      onInitialImageUpload(null);
-    }
+  // Handle initial image upload
+  const handleFileUpload = (file) => {
+    setUploadedFile(file);
+    onInitialImageUpload(file);
   };
 
   // Handle starting the evolution
@@ -93,7 +79,7 @@ const MainArea = ({
         id: Date.now(),
         model_name: 'Human Input',
         text: initialPrompt,
-        image: uploadedFile || null, // already data URL if provided
+        image: uploadedFile ? URL.createObjectURL(uploadedFile) : null,
         image_description: uploadedFile ? "Initial uploaded image" : null,
         prompt: null,
         timestamp: new Date().toLocaleTimeString(),
@@ -117,7 +103,7 @@ const MainArea = ({
   };
 
   // Handle continuing the evolution
-  const handleContinueEvolution = async (guidance = '') => {
+  const handleContinueEvolution = async () => {
     if (inFlightRef.current || isLoading) return; // prevent concurrent continue
     if (!isApiKeySet) {
       setError('Please set your API key first');
@@ -130,7 +116,7 @@ const MainArea = ({
     onClearMessages();
 
     try {
-      await generateNextTurn(conversation, currentTurn, guidance, null);
+      await generateNextTurn(conversation, currentTurn, '', null);
       setSuccess(`Turn ${currentTurn + 1} generated successfully!`);
       setTimeout(() => setSuccess(null), 3000);
     } catch (error) {
@@ -167,10 +153,6 @@ const MainArea = ({
       // Subsequent turns: evolve from previous image
       autoPrompt = "Based on the previous image, select one important detail for you independently of the rest of the image (e.g., a specific object, character, or element). Describe your choice in text and then create a new story, situation, anecdote or other idea in which that detail is preserved as a detail, not necessarily the main subject of the image. Then, generate a new image from your description, while keeping only this detail recognizable.";
 
-      if (initialPromptText) {
-        autoPrompt += `\n\nDirector's Guidance: ${initialPromptText}`;
-      }
-
       // Find the most recent image
       for (let i = currentConversation.length - 1; i >= 0; i--) {
         if (currentConversation[i].image) {
@@ -197,8 +179,7 @@ const MainArea = ({
       prompt: autoPrompt,
       timestamp: new Date().toLocaleTimeString(),
       style: style,
-      metrics: result.metrics || null,
-      error: result.error || null
+      metrics: result.metrics || null
     };
 
     setConversation(prev => [...prev, newTurn]);
@@ -240,14 +221,18 @@ const MainArea = ({
         console.log(`📊 Regeneration metrics: request ≈ ${kb(result.metrics.requestBytes)} KB` + (result.metrics.imageDecodedBytes ? ` | images (decoded) ≈ ${kb(result.metrics.imageDecodedBytes)} KB` : ''));
       }
 
+      // Clean up old blob URL
+      if (turnToRegenerate.image) {
+        URL.revokeObjectURL(turnToRegenerate.image);
+      }
+
       const updatedTurn = {
         ...turnToRegenerate,
         text: result.text,
         image: result.image,
         image_description: result.text,
         timestamp: new Date().toLocaleTimeString(),
-        metrics: result.metrics || turnToRegenerate.metrics || null,
-        error: result.error || null
+        metrics: result.metrics || turnToRegenerate.metrics || null
       };
 
       const newConversation = [...conversation];
@@ -264,15 +249,45 @@ const MainArea = ({
     }
   };
 
-  const messagesEndRef = useRef(null);
-
-  // Auto-scroll to bottom when conversation updates
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [conversation]);
-
   return (
     <div className="main-area">
+      {forkInfo?.parentId && (
+        <div
+          style={{
+            margin: '14px 18px 0 18px',
+            padding: '12px 14px',
+            borderRadius: '14px',
+            border: '1px solid var(--border-color)',
+            background: 'rgba(255,255,255,0.03)',
+            display: 'flex',
+            gap: '12px',
+            alignItems: 'center',
+          }}
+        >
+          {forkInfo?.parentImage ? (
+            <img
+              src={forkInfo.parentImage}
+              alt="Fork origin"
+              style={{
+                width: '54px',
+                height: '54px',
+                borderRadius: '12px',
+                objectFit: 'cover',
+                border: '1px solid rgba(255,255,255,0.10)'
+              }}
+            />
+          ) : null}
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 800 }}>
+              🌱 Working on a fork
+            </div>
+            <div style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginTop: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              From {String(forkInfo.parentId).slice(0, 10)}… at turn {Number.isFinite(forkInfo.parentTurn) ? forkInfo.parentTurn : '?'}
+            </div>
+          </div>
+        </div>
+      )}
+
       {conversation.length === 0 ? (
         <InitialSetup
           initialPrompt={initialPrompt}
@@ -286,26 +301,16 @@ const MainArea = ({
           style={style}
         />
       ) : (
-        <>
-          <ConversationDisplay
-            conversation={conversation}
-            onContinue={handleContinueEvolution}
-            onRegenerateTurn={handleRegenerateTurn}
-            onUndoTurn={undoLastTurn}
-            currentTurn={currentTurn}
-            style={style}
-            isLoading={isLoading}
-            isApiKeySet={isApiKeySet}
-          />
-          <div ref={messagesEndRef} />
-        </>
-      )}
-      
-      {conversation.length >= 4 && (
-        <div className="warning" style={{ margin: '20px 0' }}>
-          <strong>💰 Cost Awareness:</strong> You have generated {conversation.length} turns. 
-          Generating many images can consume API credits quickly.
-        </div>
+        <ConversationDisplay
+          conversation={conversation}
+          onContinue={handleContinueEvolution}
+          onRegenerateTurn={handleRegenerateTurn}
+          onForkFromTurn={onForkFromTurn}
+          currentTurn={currentTurn}
+          style={style}
+          isLoading={isLoading}
+          isApiKeySet={isApiKeySet}
+        />
       )}
     </div>
   );
