@@ -23,17 +23,11 @@
 
 body {
   margin: 0;
-  background-color: #050510;
+  background-color: #1a100a;
   font-family: 'Lato', sans-serif;
   color: var(--text-primary);
   height: 100vh;
   overflow: hidden;
-
-  /* Mystical Fantasy Background - imaginative void/nebula */
-  background-image: url('./page-bg.png');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
 }
 
 /* === LAYOUT === */
@@ -215,6 +209,15 @@ body {
   padding: 30px 20px;
   position: relative;
 
+  /* Unified Art Nouveau background with integrated side bands */
+  background-image: url('./wall-bg.png');
+  background-size: min(100%, 1400px) auto;
+  /* Cap at 1400px to match card grid */
+  background-repeat: repeat-y;
+  background-position: top center;
+  background-attachment: local;
+  /* Scroll with content */
+
   /* Scrollbar override */
   scrollbar-width: thin;
   scrollbar-color: var(--gold-dark) #1a1008;
@@ -225,8 +228,10 @@ body {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 40px;
-  max-width: 1400px;
+  max-width: 1300px;
   margin: 0 auto;
+  padding: 0 50px;
+  /* Keep cards away from side strips */
 }
 
 .rpg-card {
@@ -290,16 +295,16 @@ body {
 
 /* Image container with arched top to match frame */
 .rpg-card__imageContainer {
-  margin: 8px auto 8px auto;
-  /* Reduced bottom margin */
-  width: 88%;
-  aspect-ratio: 1 / 0.92;
-  /* Slightly shorter height */
+  margin: 6px auto 6px auto;
+  width: 94%;
+  /* Larger image */
+  aspect-ratio: 1 / 1;
+  /* Square for maximum coverage */
   /* Arched top corners, subtle rounded bottom */
-  border-top-left-radius: 50% 30%;
-  border-top-right-radius: 50% 30%;
-  border-bottom-left-radius: 8px;
-  border-bottom-right-radius: 8px;
+  border-top-left-radius: 50% 25%;
+  border-top-right-radius: 50% 25%;
+  border-bottom-left-radius: 6px;
+  border-bottom-right-radius: 6px;
   border: 2px solid rgba(80, 60, 40, 0.8);
   /* Deep Recess Shadow */
   box-shadow:
@@ -331,17 +336,15 @@ body {
   opacity: 1;
 }
 
-/* CONTENT AREA - Open layout, no fixed box */
+/* CONTENT AREA - Compact layout for larger image */
 .rpg-card__content {
-  margin-top: 8px;
-  /* Reduced from 10px */
-  padding: 0 8px;
+  margin-top: 6px;
+  padding: 0 6px;
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  /* Reduced gap */
+  gap: 3px;
 }
 
 .rpg-card__title {
@@ -349,14 +352,14 @@ body {
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
   font-family: 'Cinzel', serif;
   font-weight: 700;
-  font-size: 0.95rem;
-  /* Reduced from 1.1rem */
-  line-height: 1.25;
+  font-size: 0.8rem;
+  /* Smaller for more image space */
+  line-height: 1.2;
   margin: 0;
-  /* Allow text to take necessary space */
   display: -webkit-box;
-  -webkit-line-clamp: 3;
-  line-clamp: 3;
+  -webkit-line-clamp: 2;
+  /* Allow 2 lines max */
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -383,7 +386,7 @@ body {
 .rpg-card__actions {
   display: flex;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   opacity: 0.8;
   transition: opacity 0.2s;
   margin-top: 2px;
@@ -393,20 +396,19 @@ body {
   opacity: 1;
 }
 
-/* Elegant Warm Buttons */
+/* Elegant Warm Buttons - Compact */
 .rpg-btn-small {
   background: linear-gradient(to bottom, #8b6d45 0%, #5d4a2a 100%);
   color: #fff8e7;
   border: 1px solid #a08050;
   font-family: 'Cinzel', serif;
   font-weight: 600;
-  font-size: 0.65rem;
-  /* Reduced font size */
+  font-size: 0.6rem;
+  /* Smaller buttons */
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding: 6px 12px;
-  /* Reduced padding */
-  border-radius: 6px;
+  letter-spacing: 0.03em;
+  padding: 5px 10px;
+  border-radius: 5px;
   cursor: pointer;
   box-shadow:
     0 2px 4px rgba(0, 0, 0, 0.4),
