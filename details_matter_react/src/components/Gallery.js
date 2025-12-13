@@ -245,13 +245,13 @@ const Gallery = ({
         <div className="dm-gallery__left">
           <h2 className="gallery-title">🎨 Thread Gallery</h2>
           <div className="dm-gallery__seg">
-            <button 
+            <button
               className={`tab ${activeTab === 'local' ? 'active' : ''}`}
               onClick={() => setActiveTab('local')}
             >
               Local ({localGallery.length})
             </button>
-            <button 
+            <button
               className={`tab ${activeTab === 'cloud' ? 'active' : ''}`}
               onClick={() => setActiveTab('cloud')}
             >
@@ -311,22 +311,22 @@ const Gallery = ({
             {isConfiguring ? (
               <div className="config-panel">
                 <p>Configure Cloudflare Worker URL to access global gallery.</p>
-                <input 
-                  type="text" 
-                  placeholder="https://your-worker.workers.dev" 
+                <input
+                  type="text"
+                  placeholder="https://your-worker.workers.dev"
                   value={workerUrlInput}
                   onChange={(e) => setWorkerUrlInput(e.target.value)}
                 />
-                <div style={{display:'flex', gap:'10px', justifyContent:'center', marginTop:'10px'}}>
-                    <button className="primary-button" onClick={handleSaveConfig}>Save</button>
-                    <button className="secondary-button" onClick={() => setIsConfiguring(false)}>Cancel</button>
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '10px' }}>
+                  <button className="primary-button" onClick={handleSaveConfig}>Save</button>
+                  <button className="secondary-button" onClick={() => setIsConfiguring(false)}>Cancel</button>
                 </div>
               </div>
             ) : (
               <>
                 <div className="cloud-controls">
-                   <button className="secondary-button small" onClick={() => setIsConfiguring(true)}>⚙️ Config</button>
-                   <button className="secondary-button small" onClick={loadCloudGallery}>🔄 Refresh</button>
+                  <button className="secondary-button small" onClick={() => setIsConfiguring(true)}>⚙️ Config</button>
+                  <button className="secondary-button small" onClick={loadCloudGallery}>🔄 Refresh</button>
                 </div>
                 {loadingCloud ? (
                   <div className="loading">Loading cloud threads...</div>
@@ -419,16 +419,16 @@ const Gallery = ({
                           >
                             🌱 Fork
                           </button>
-                      {activeTab === 'local' && onDeleteThread ? (
-                        <button
-                          type="button"
-                          className="dm-tile__action"
-                          onClick={(e) => { e.stopPropagation(); onDeleteThread(t.id); }}
-                          title="Delete from local gallery"
-                        >
-                          🗑
-                        </button>
-                      ) : null}
+                          {activeTab === 'local' && onDeleteThread ? (
+                            <button
+                              type="button"
+                              className="dm-tile__action"
+                              onClick={(e) => { e.stopPropagation(); onDeleteThread(t.id); }}
+                              title="Delete from local gallery"
+                            >
+                              🗑
+                            </button>
+                          ) : null}
                         </div>
                       </div>
                     </div>
@@ -476,451 +476,7 @@ const Gallery = ({
           onFork={() => onForkThread(normalizedThreads[previewIndex], activeTab === 'cloud')}
         />
       )}
-      
-      <style>{`
-        .dm-gallery {
-          background: var(--background-base);
-          width: 100%;
-          height: 100vh;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden;
-        }
 
-        .dm-gallery__left, .dm-gallery__right {
-          display: flex;
-          align-items: center;
-          gap: 14px;
-        }
-        .dm-gallery__right {
-          justify-content: flex-end;
-        }
-        .dm-gallery__seg {
-          display: inline-flex;
-          background: rgba(255,255,255,0.05);
-          border-radius: 999px;
-          padding: 4px;
-          border: 1px solid rgba(255,255,255,0.06);
-        }
-        
-        .gallery-header {
-          padding: 20px 40px;
-          border-bottom: 1px solid var(--border-color);
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          background: rgba(11, 16, 32, 0.8);
-          backdrop-filter: blur(10px);
-          z-index: 10;
-        }
-        
-        .gallery-title {
-           font-size: 1.5rem;
-           background: linear-gradient(90deg, #fff, #a5b4fc);
-           -webkit-background-clip: text;
-           -webkit-text-fill-color: transparent;
-           margin: 0;
-        }
-
-        .gallery-tabs {
-          display: flex;
-        }
-        
-        .tab {
-          padding: 8px 20px;
-          background: none;
-          border: none;
-          color: var(--text-secondary);
-          cursor: pointer;
-          font-weight: 600;
-          font-size: 0.9rem;
-          border-radius: 16px;
-          transition: all 0.2s;
-        }
-        
-        .tab.active {
-          color: white;
-          background: var(--accent-primary);
-          box-shadow: 0 2px 10px rgba(99, 102, 241, 0.3);
-        }
-        
-        .gallery-content {
-          flex: 1;
-          overflow-y: auto;
-          padding: 16px 0 40px 0;
-        }
-
-        .dm-resume {
-          max-width: 1400px;
-          margin: 0 auto 16px auto;
-          padding: 0 40px;
-          display: flex;
-          align-items: center;
-          gap: 14px;
-        }
-        .dm-resume__label {
-          font-weight: 700;
-          font-size: 0.9rem;
-          color: var(--text-secondary);
-          background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(255,255,255,0.06);
-          padding: 8px 12px;
-          border-radius: 999px;
-        }
-        .dm-resume__content {
-          flex: 1;
-          background: rgba(255,255,255,0.03);
-          border: 1px solid rgba(255,255,255,0.06);
-          border-radius: 16px;
-          padding: 14px 16px;
-        }
-        .dm-resume__title { font-weight: 750; }
-        .dm-resume__meta {
-          color: var(--text-secondary);
-          font-size: 0.85rem;
-          display: flex;
-          gap: 12px;
-          margin-top: 6px;
-        }
-        .dm-resume__actions { display: flex; gap: 10px; }
-        
-        .cta-button {
-            background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-secondary) 100%);
-            color: white;
-            border: none;
-            padding: 16px 40px;
-            font-size: 1.1rem;
-            border-radius: 30px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.4);
-            transition: transform 0.2s, box-shadow 0.2s;
-        }
-        .cta-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 15px 40px rgba(99, 102, 241, 0.5);
-        }
-
-        .dm-wall {
-          max-width: 1400px;
-          margin: 0 auto;
-          padding: 0 40px;
-        }
-        .dm-wall__hint {
-          color: var(--text-secondary);
-          font-size: 0.9rem;
-          margin: 8px 0 12px 0;
-        }
-        .dm-masonry {
-          column-count: 4;
-          column-gap: 20px;
-        }
-        @media (max-width: 1200px) { .dm-masonry { column-count: 3; } }
-        @media (max-width: 820px) { .dm-masonry { column-count: 2; } }
-        @media (max-width: 520px) { .dm-masonry { column-count: 1; } }
-
-        .dm-tile {
-          width: 100%;
-          display: inline-block;
-          break-inside: avoid;
-          margin: 0 0 14px 0;
-          padding: 10px;
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 18px;
-          background: rgba(255,255,255,0.03);
-          cursor: pointer;
-          position: relative;
-          box-shadow: 0 18px 50px rgba(0,0,0,0.35);
-          transition: transform 0.22s ease, border-color 0.22s ease, background 0.22s ease;
-          text-align: left;
-          box-sizing: border-box; /* Ensure padding doesn't overflow width */
-        }
-        .dm-tile:active { transform: translateY(0); }
-        .dm-tile:hover {
-          transform: translateY(-2px);
-          border-color: rgba(255,255,255,0.2);
-          background: rgba(255,255,255,0.05);
-        }
-        .dm-tile__thumb {
-          border-radius: 12px;
-          overflow: hidden;
-          position: relative;
-        }
-        .dm-tile__thumb img {
-          width: 100%;
-          height: auto;
-          display: block;
-        }
-
-        .dm-tile__vignette{
-          position: absolute;
-          right: 10px;
-          bottom: 10px;
-          width: 52px;
-          height: 52px;
-          border-radius: 14px;
-          overflow: hidden;
-          border: 1px solid rgba(255,255,255,0.16);
-          background: rgba(0,0,0,0.35);
-          box-shadow: 0 12px 28px rgba(0,0,0,0.5);
-        }
-        .dm-tile__vignette img{ width:100%; height:100%; object-fit: cover; display:block; opacity: 0.98; }
-        .dm-tile__empty {
-          padding: 60px 16px;
-          color: var(--text-secondary);
-          text-align: center;
-        }
-        .dm-tile__overlay {
-          position: relative;
-          padding: 12px 2px 2px 2px;
-        }
-        .dm-tile__title {
-          font-weight: 800;
-          font-size: 0.95rem;
-          color: white;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-        }
-        .dm-tile__meta {
-          display: flex;
-          gap: 10px;
-          margin-top: 6px;
-          color: rgba(255,255,255,0.75);
-          font-size: 0.78rem;
-        }
-
-        .dm-tile__actionsRow {
-          display: flex;
-          gap: 8px;
-          margin-top: 10px;
-        }
-        .dm-tile__action {
-          border: 1px solid rgba(255,255,255,0.14);
-          background: rgba(0,0,0,0.28);
-          color: rgba(255,255,255,0.92);
-          padding: 8px 10px;
-          border-radius: 999px;
-          font-size: 0.82rem;
-          font-weight: 650;
-          cursor: pointer;
-          transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease;
-        }
-        .dm-tile__action:hover {
-          transform: translateY(-1px);
-          background: rgba(0,0,0,0.38);
-          border-color: rgba(255,255,255,0.22);
-        }
-        .dm-tile__fork {
-          padding: 2px 8px;
-          border-radius: 999px;
-          border: 1px solid rgba(255,255,255,0.18);
-          background: rgba(99, 102, 241, 0.28);
-          color: rgba(255,255,255,0.9);
-        }
-
-        .dm-tile__strip {
-          margin-top: 10px;
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 8px;
-        }
-        .dm-tile__stripItem {
-          aspect-ratio: 1 / 1;
-          border-radius: 10px;
-          overflow: hidden;
-          border: 1px solid rgba(255,255,255,0.10);
-          background: rgba(0,0,0,0.30);
-          box-shadow: 0 10px 20px rgba(0,0,0,0.30);
-        }
-        .dm-tile__stripItem img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          display: block;
-          opacity: 0.95;
-        }
-
-        .dm-thread-card {
-          background: rgba(255,255,255,0.03);
-          border: 1px solid rgba(255,255,255,0.08);
-          border-radius: 18px;
-          padding: 14px;
-          box-shadow: 0 16px 40px rgba(0,0,0,0.35);
-          backdrop-filter: blur(10px);
-        }
-        .dm-thread-card__top { display:flex; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
-        .dm-thread-card__title { font-weight: 800; max-width: 75%; overflow:hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .dm-thread-card__date { color: var(--text-secondary); font-size: 0.8rem; }
-        .dm-thread-card__thumb {
-          width: 100%;
-          aspect-ratio: 1 / 1;
-          border-radius: 14px;
-          overflow: hidden;
-          background: rgba(0,0,0,0.4);
-          border: 1px solid rgba(255,255,255,0.06);
-        }
-        .dm-thread-card__thumb img { width: 100%; height: 100%; object-fit: cover; display:block; }
-        .dm-thread-card__thumb--empty { display:flex; align-items:center; justify-content:center; height:100%; color: var(--text-secondary); font-size: 0.9rem; }
-        .dm-thread-card__strip {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 8px;
-          margin-top: 10px;
-        }
-        .dm-thread-card__stripItem {
-          aspect-ratio: 1 / 1;
-          border-radius: 10px;
-          overflow: hidden;
-          background: rgba(0,0,0,0.35);
-          border: 1px solid rgba(255,255,255,0.06);
-        }
-        .dm-thread-card__stripItem img { width:100%; height:100%; object-fit: cover; display:block; }
-        .dm-thread-card__meta {
-          margin-top: 12px;
-          display:flex;
-          justify-content: space-between;
-          color: var(--text-secondary);
-          font-size: 0.85rem;
-        }
-        .dm-thread-card__fork { margin-top: 6px; color: var(--accent-primary); font-size: 0.82rem; }
-        .dm-thread-card__actions { margin-top: 12px; display:flex; gap: 10px; }
-        .dm-thread-card__actions button { flex: 1; }
-
-        .dm-tree {
-          max-width: 1400px;
-          margin: 0 auto;
-          padding: 0 40px;
-        }
-
-        .dm-treeMap {
-          height: min(72vh, 720px);
-          border-radius: 18px;
-          border: 1px solid rgba(255,255,255,0.08);
-          background: rgba(255,255,255,0.02);
-          overflow: hidden;
-          position: relative;
-          box-shadow: 0 18px 50px rgba(0,0,0,0.35);
-        }
-        .dm-treeMap__hint {
-          position: absolute;
-          left: 14px;
-          bottom: 12px;
-          color: rgba(255,255,255,0.72);
-          font-size: 0.82rem;
-          background: rgba(0,0,0,0.35);
-          border: 1px solid rgba(255,255,255,0.08);
-          padding: 8px 10px;
-          border-radius: 12px;
-          z-index: 5;
-        }
-        .dm-treeMap__surface {
-          position: absolute;
-          inset: 0;
-          transform-origin: 0 0;
-          will-change: transform;
-        }
-        .dm-treeNode {
-          position: absolute;
-          width: 240px;
-          border-radius: 16px;
-          overflow: hidden;
-          border: 1px solid rgba(255,255,255,0.08);
-          background: rgba(255,255,255,0.03);
-          box-shadow: 0 16px 40px rgba(0,0,0,0.35);
-        }
-        .dm-treeNode__img {
-          width: 100%;
-          aspect-ratio: 16 / 10;
-          overflow: hidden;
-          background: rgba(0,0,0,0.4);
-          position: relative;
-        }
-        .dm-treeNode__img img { width: 100%; height: 100%; object-fit: cover; display: block; }
-
-        .dm-treeNode__forkThumb{
-          position: absolute;
-          right: 10px;
-          bottom: 10px;
-          width: 46px;
-          height: 46px;
-          border-radius: 12px;
-          overflow: hidden;
-          border: 1px solid rgba(255,255,255,0.16);
-          background: rgba(0,0,0,0.35);
-          box-shadow: 0 10px 24px rgba(0,0,0,0.45);
-        }
-        .dm-treeNode__forkThumb img{ width:100%; height:100%; object-fit: cover; display:block; }
-        .dm-treeNode__body { padding: 10px; }
-        .dm-treeNode__title { font-weight: 800; font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .dm-treeNode__meta { margin-top: 6px; color: var(--text-secondary); font-size: 0.8rem; display:flex; justify-content: space-between; gap: 10px; }
-        .dm-treeNode__actions { margin-top: 10px; display:flex; gap: 8px; }
-        
-        .dm-treeNode__action {
-          flex: 1;
-          border: 1px solid rgba(255,255,255,0.14);
-          background: rgba(0,0,0,0.28);
-          color: rgba(255,255,255,0.92);
-          padding: 8px 10px;
-          border-radius: 999px;
-          font-size: 0.82rem;
-          font-weight: 650;
-          cursor: pointer;
-          transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease;
-          pointer-events: auto; /* Ensure clickable */
-          z-index: 10;
-        }
-        .dm-treeNode__action:hover {
-          transform: translateY(-1px);
-          background: rgba(0,0,0,0.38);
-          border-color: rgba(255,255,255,0.22);
-        }
-
-        .dm-treeEdges {
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 60px;
-            color: var(--text-secondary);
-            width: 100%;
-        }
-        
-        .cloud-section {
-            padding: 20px 40px;
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-        
-        .config-panel {
-            max-width: 500px;
-            margin: 40px auto;
-            background: rgba(255,255,255,0.05);
-            padding: 30px;
-            border-radius: 16px;
-            text-align: center;
-        }
-        
-        /* Mobile adjustments */
-        @media (max-width: 768px) {
-            .gallery-header {
-                padding: 15px 20px;
-                flex-direction: column;
-                gap: 15px;
-                align-items: flex-start;
-            }
-            .tab {
-                flex: 1;
-                text-align: center;
-            }
-            .dm-wall, .dm-tree, .dm-resume { padding: 0 20px; }
-            .cta-button { width: 100%; }
-            .dm-gallery__left, .dm-gallery__right { width: 100%; justify-content: space-between; }
-        }
-      `}</style>
     </div>
   );
 };
@@ -1001,11 +557,11 @@ const PreviewOverlay = ({ thread, isCloud, getPreviewImages, getThreadImages, on
           >
             ←
           </button>
-          
-          <div className="dm-preview__indicators" style={{display:'flex', gap:'6px'}}>
-            <span style={{width:'6px', height:'6px', borderRadius:'50%', background:'rgba(255,255,255,0.4)'}}></span>
-            <span style={{width:'6px', height:'6px', borderRadius:'50%', background:'rgba(255,255,255,0.4)'}}></span>
-            <span style={{width:'6px', height:'6px', borderRadius:'50%', background:'rgba(255,255,255,0.4)'}}></span>
+
+          <div className="dm-preview__indicators" style={{ display: 'flex', gap: '6px' }}>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'rgba(255,255,255,0.4)' }}></span>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'rgba(255,255,255,0.4)' }}></span>
+            <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'rgba(255,255,255,0.4)' }}></span>
           </div>
 
           <div className="dm-preview__hint">Swipe to browse story</div>
@@ -1024,65 +580,6 @@ const PreviewOverlay = ({ thread, isCloud, getPreviewImages, getThreadImages, on
         </div>
       </div>
 
-      <style>{`
-        .dm-preview{
-          position: fixed;
-          inset: 0;
-          z-index: 1000;
-          background: rgba(0,0,0,0.82);
-          backdrop-filter: blur(14px);
-          display:flex;
-          align-items: flex-end;
-          justify-content: center;
-          padding: 16px;
-        }
-        .dm-preview__sheet{
-          width: min(560px, 100%);
-          background: rgba(14, 21, 38, 0.9);
-          border: 1px solid rgba(255,255,255,0.10);
-          border-radius: 22px;
-          box-shadow: 0 26px 70px rgba(0,0,0,0.6);
-          padding: 14px;
-        }
-        .dm-preview__top{display:flex; justify-content: space-between; gap: 12px; align-items: center;}
-        .dm-preview__title{font-weight: 850; overflow:hidden; text-overflow: ellipsis; white-space: nowrap;}
-        .dm-preview__image{margin-top: 12px; border-radius: 16px; overflow:hidden; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.06);}
-        .dm-preview__image img{width:100%; height:auto; display:block;}
-        .dm-preview__empty{padding: 80px 16px; color: var(--text-secondary); text-align:center;}
-
-        .dm-preview__strip{
-          margin-top: 10px;
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
-          gap: 8px;
-        }
-        .dm-preview__stripItem{
-          border: 1px solid rgba(255,255,255,0.10);
-          background: rgba(0,0,0,0.28);
-          border-radius: 12px;
-          overflow: hidden;
-          padding: 0;
-          cursor: pointer;
-          aspect-ratio: 1 / 1;
-        }
-        .dm-preview__stripItem.active{
-          border-color: rgba(255,255,255,0.28);
-        }
-        .dm-preview__stripItem img{width:100%; height:100%; object-fit: cover; display:block; opacity: 0.95;}
-
-        .dm-preview__nav{margin-top: 10px; display:flex; align-items:center; justify-content: space-between; gap: 12px; position:relative;}
-        .dm-preview__hint{
-            color: var(--text-secondary); 
-            font-size: 0.85rem; 
-            position: absolute; 
-            left: 50%; 
-            transform: translateX(-50%);
-            white-space: nowrap;
-        }
-        .dm-preview__indicators{ display:none !important; } /* Hide fake dots, text is enough, but keep structure valid */
-        .dm-preview__actions{margin-top: 12px; display:flex; gap: 10px;}
-        .dm-preview__actions button{flex: 1;}
-      `}</style>
     </div>
   );
 };
