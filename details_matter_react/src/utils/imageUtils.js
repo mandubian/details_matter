@@ -1,5 +1,5 @@
 // Utility to compress images to WebP for efficient storage
-export const compressImage = (dataUrl, maxWidth = 1024, quality = 0.8) => {
+export const compressImage = (dataUrl, maxWidth = 1280, quality = 0.8) => {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.src = dataUrl;
@@ -41,5 +41,6 @@ export const compressConversation = async (conversation) => {
   }));
   return compressed;
 };
+
 
 

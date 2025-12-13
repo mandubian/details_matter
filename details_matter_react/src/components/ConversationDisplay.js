@@ -23,16 +23,23 @@ const ConversationDisplay = ({
     <div>
       <div className="conversation">
         {conversation.map((turn, index) => (
+          (() => {
+            const isLast = index === conversation.length - 1;
+            const canRegenerate = isLast && turn?.model_name !== 'Human Input';
+            return (
           <Turn
             key={turn.id || index}
             turn={turn}
             index={index}
-            onRegenerate={() => onRegenerateTurn(index)}
+            canRegenerate={canRegenerate}
+            onRegenerate={canRegenerate ? () => onRegenerateTurn(index) : null}
             onUndo={onUndoTurn ? () => onUndoTurn(index) : null}
             onFork={onForkFromTurn ? () => onForkFromTurn(index) : null}
             isLoading={isLoading}
             isApiKeySet={isApiKeySet}
           />
+            );
+          })()
         ))}
 
         {conversation.length > 0 && (

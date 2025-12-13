@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const Turn = ({ turn, index, onRegenerate, onUndo, onFork, isLoading, isApiKeySet }) => {
+const Turn = ({ turn, index, canRegenerate = false, onRegenerate, onUndo, onFork, isLoading, isApiKeySet }) => {
   const [showRawResponse, setShowRawResponse] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
 
@@ -55,7 +55,8 @@ const Turn = ({ turn, index, onRegenerate, onUndo, onFork, isLoading, isApiKeySe
         </>
       ) : (
         // Only show error for AI turns, or if there's an explicit error on human turn (unlikely)
-        (turn.model_name !== 'Human Input' || turn.error) && (
+        // We strictly avoid showing "No image generated" for Human Input unless there is a real error message.
+        ((turn.model_name !== 'Human Input' && !turn.image) || (turn.error && turn.model_name === 'Human Input')) && (
           <div className="error">
             <div>
               <strong>⚠️ No image generated</strong>
@@ -110,7 +111,7 @@ const Turn = ({ turn, index, onRegenerate, onUndo, onFork, isLoading, isApiKeySe
 
       {(turn.model_name !== 'Human Input' || onFork) && (
         <div className="turn-controls" style={{marginTop: '20px', display: 'flex', gap: '8px', flexWrap: 'wrap'}}>
-          {turn.model_name !== 'Human Input' && (
+          {turn.model_name !== 'Human Input' && canRegenerate && onRegenerate && (
             <button
               className="secondary-button"
               onClick={onRegenerate}

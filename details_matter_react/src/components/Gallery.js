@@ -8,6 +8,7 @@ const Gallery = ({
   onNewThread,
   onOpenThread,
   onForkThread,
+  onDeleteThread,
 }) => {
   const [activeTab, setActiveTab] = useState('local'); // 'local' or 'cloud'
   const [browseMode, setBrowseMode] = useState('wall'); // 'wall' | 'tree'
@@ -54,6 +55,25 @@ const Gallery = ({
       }
 
       return images.map(x => x.img).slice(0, 4);
+    }
+    return thread?.thumbnail ? [thread.thumbnail] : [];
+  };
+
+  // Full thread images for the preview overlay (so you can browse the evolution).
+  // For forks, prefer browsing from the fork point forward.
+  const getThreadImagesForPreview = (thread) => {
+    if (thread?.conversation && Array.isArray(thread.conversation)) {
+      const forkTurn = Number.isFinite(thread?.forkInfo?.parentTurn) ? thread.forkInfo.parentTurn : null;
+      const all = thread.conversation
+        .map((t, idx) => ({ idx, img: t?.image }))
+        .filter(x => !!x.img);
+
+      if (forkTurn !== null) {
+        const postFork = all.filter(x => x.idx > forkTurn).map(x => x.img);
+        if (postFork.length > 0) return postFork;
+      }
+
+      return all.map(x => x.img);
     }
     return thread?.thumbnail ? [thread.thumbnail] : [];
   };
@@ -204,6 +224,16 @@ const Gallery = ({
           <button className="secondary-button" onClick={() => onForkThread(thread, isCloud)} disabled={isLoading}>
             Fork
           </button>
+          {!isCloud && onDeleteThread && (
+            <button
+              className="secondary-button"
+              onClick={() => onDeleteThread(thread.id)}
+              disabled={isLoading}
+              title="Delete from local gallery"
+            >
+              🗑
+            </button>
+          )}
         </div>
       </div>
     );
@@ -389,6 +419,16 @@ const Gallery = ({
                           >
                             🌱 Fork
                           </button>
+                      {activeTab === 'local' && onDeleteThread ? (
+                        <button
+                          type="button"
+                          className="dm-tile__action"
+                          onClick={(e) => { e.stopPropagation(); onDeleteThread(t.id); }}
+                          title="Delete from local gallery"
+                        >
+                          🗑
+                        </button>
+                      ) : null}
                         </div>
                       </div>
                     </div>
@@ -428,6 +468,7 @@ const Gallery = ({
           thread={normalizedThreads[previewIndex]}
           isCloud={activeTab === 'cloud'}
           getPreviewImages={getPreviewImages}
+          getThreadImages={getThreadImagesForPreview}
           onClose={closePreview}
           onPrev={() => stepPreview(-1)}
           onNext={() => stepPreview(1)}
@@ -572,7 +613,7 @@ const Gallery = ({
         }
         .dm-masonry {
           column-count: 4;
-          column-gap: 14px;
+          column-gap: 20px;
         }
         @media (max-width: 1200px) { .dm-masonry { column-count: 3; } }
         @media (max-width: 820px) { .dm-masonry { column-count: 2; } }
@@ -592,6 +633,7 @@ const Gallery = ({
           box-shadow: 0 18px 50px rgba(0,0,0,0.35);
           transition: transform 0.22s ease, border-color 0.22s ease, background 0.22s ease;
           text-align: left;
+          box-sizing: border-box; /* Ensure padding doesn't overflow width */
         }
         .dm-tile:active { transform: translateY(0); }
         .dm-tile:hover {
@@ -813,7 +855,26 @@ const Gallery = ({
         .dm-treeNode__title { font-weight: 800; font-size: 0.95rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .dm-treeNode__meta { margin-top: 6px; color: var(--text-secondary); font-size: 0.8rem; display:flex; justify-content: space-between; gap: 10px; }
         .dm-treeNode__actions { margin-top: 10px; display:flex; gap: 8px; }
-        .dm-treeNode__actions button { flex: 1; padding: 10px 12px; }
+        
+        .dm-treeNode__action {
+          flex: 1;
+          border: 1px solid rgba(255,255,255,0.14);
+          background: rgba(0,0,0,0.28);
+          color: rgba(255,255,255,0.92);
+          padding: 8px 10px;
+          border-radius: 999px;
+          font-size: 0.82rem;
+          font-weight: 650;
+          cursor: pointer;
+          transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease;
+          pointer-events: auto; /* Ensure clickable */
+          z-index: 10;
+        }
+        .dm-treeNode__action:hover {
+          transform: translateY(-1px);
+          background: rgba(0,0,0,0.38);
+          border-color: rgba(255,255,255,0.22);
+        }
 
         .dm-treeEdges {
           position: absolute;
@@ -866,11 +927,18 @@ const Gallery = ({
 
 export default Gallery;
 
-const PreviewOverlay = ({ thread, isCloud, getPreviewImages, onClose, onPrev, onNext, onOpen, onFork }) => {
-  const images = getPreviewImages(thread);
+const PreviewOverlay = ({ thread, isCloud, getPreviewImages, getThreadImages, onClose, onPrev, onNext, onOpen, onFork }) => {
+  const images = (getThreadImages ? getThreadImages(thread) : getPreviewImages(thread)) || [];
   const [activeIdx, setActiveIdx] = useState(0);
   const [touchStart, setTouchStart] = useState(null);
 
+  // When switching threads, reset to first frame
+  useEffect(() => {
+    setActiveIdx(0);
+  }, [thread?.id]);
+
+  // Swipe logic: primarily navigates IMAGES within the thread.
+  // If at the end/start, we could loop or stop. For now, let's stop to avoid accidental thread switching.
   const onTouchStart = (e) => {
     const t = e.touches?.[0];
     if (!t) return;
@@ -882,8 +950,13 @@ const PreviewOverlay = ({ thread, isCloud, getPreviewImages, onClose, onPrev, on
     const dx = t.clientX - touchStart.x;
     const dy = t.clientY - touchStart.y;
     if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
-      if (dx > 0) onPrev();
-      else onNext();
+      if (dx > 0) {
+        // Swipe Right -> Prev Image
+        if (activeIdx > 0) setActiveIdx(activeIdx - 1);
+      } else {
+        // Swipe Left -> Next Image
+        if (activeIdx < images.length - 1) setActiveIdx(activeIdx + 1);
+      }
     }
     setTouchStart(null);
   };
@@ -893,7 +966,11 @@ const PreviewOverlay = ({ thread, isCloud, getPreviewImages, onClose, onPrev, on
       <div className="dm-preview__sheet" onClick={(e) => e.stopPropagation()} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         <div className="dm-preview__top">
           <div className="dm-preview__title">{thread.title || 'Untitled'}</div>
-          <button className="secondary-button" onClick={onClose} style={{ width: 'auto' }}>✕</button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button className="secondary-button" onClick={onPrev} style={{ width: 'auto' }} title="Previous thread">‹</button>
+            <button className="secondary-button" onClick={onNext} style={{ width: 'auto' }} title="Next thread">›</button>
+            <button className="secondary-button" onClick={onClose} style={{ width: 'auto' }}>✕</button>
+          </div>
         </div>
         <div className="dm-preview__image">
           {images?.[activeIdx] ? <img src={images[activeIdx]} alt="preview" /> : <div className="dm-preview__empty">No preview</div>}
@@ -916,9 +993,30 @@ const PreviewOverlay = ({ thread, isCloud, getPreviewImages, onClose, onPrev, on
         )}
 
         <div className="dm-preview__nav">
-          <button className="secondary-button" onClick={onPrev}>←</button>
-          <div className="dm-preview__hint">Swipe to switch thread</div>
-          <button className="secondary-button" onClick={onNext}>→</button>
+          <button
+            className="secondary-button"
+            onClick={() => { if (activeIdx > 0) setActiveIdx(activeIdx - 1); }}
+            disabled={activeIdx === 0}
+            title="Previous image"
+          >
+            ←
+          </button>
+          
+          <div className="dm-preview__indicators" style={{display:'flex', gap:'6px'}}>
+            <span style={{width:'6px', height:'6px', borderRadius:'50%', background:'rgba(255,255,255,0.4)'}}></span>
+            <span style={{width:'6px', height:'6px', borderRadius:'50%', background:'rgba(255,255,255,0.4)'}}></span>
+            <span style={{width:'6px', height:'6px', borderRadius:'50%', background:'rgba(255,255,255,0.4)'}}></span>
+          </div>
+
+          <div className="dm-preview__hint">Swipe to browse story</div>
+          <button
+            className="secondary-button"
+            onClick={() => { if (activeIdx < images.length - 1) setActiveIdx(activeIdx + 1); }}
+            disabled={activeIdx === images.length - 1}
+            title="Next image"
+          >
+            →
+          </button>
         </div>
         <div className="dm-preview__actions">
           <button className="primary-button" onClick={onOpen}>Open</button>
@@ -972,8 +1070,16 @@ const PreviewOverlay = ({ thread, isCloud, getPreviewImages, onClose, onPrev, on
         }
         .dm-preview__stripItem img{width:100%; height:100%; object-fit: cover; display:block; opacity: 0.95;}
 
-        .dm-preview__nav{margin-top: 10px; display:flex; align-items:center; justify-content: space-between; gap: 12px;}
-        .dm-preview__hint{color: var(--text-secondary); font-size: 0.85rem;}
+        .dm-preview__nav{margin-top: 10px; display:flex; align-items:center; justify-content: space-between; gap: 12px; position:relative;}
+        .dm-preview__hint{
+            color: var(--text-secondary); 
+            font-size: 0.85rem; 
+            position: absolute; 
+            left: 50%; 
+            transform: translateX(-50%);
+            white-space: nowrap;
+        }
+        .dm-preview__indicators{ display:none !important; } /* Hide fake dots, text is enough, but keep structure valid */
         .dm-preview__actions{margin-top: 12px; display:flex; gap: 10px;}
         .dm-preview__actions button{flex: 1;}
       `}</style>
@@ -998,7 +1104,7 @@ const TreeMap = ({ tree, getPreviewImages, isCloud, isLoading, onOpenThread, onF
     const edges = [];
     const isNarrow = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
     const NODE_W = isNarrow ? 200 : 240;
-    const NODE_H = isNarrow ? 180 : 190;
+    const NODE_H = isNarrow ? 260 : 280; // Increased height to prevent vertical overlap
     const GAP_X = isNarrow ? 80 : 120;
     const GAP_Y = isNarrow ? 40 : 70;
 
@@ -1215,7 +1321,15 @@ const TreeMap = ({ tree, getPreviewImages, isCloud, isLoading, onOpenThread, onF
           const forkTurn = Number.isFinite(thread?.forkInfo?.parentTurn) ? thread.forkInfo.parentTurn : null;
           const forkImg = thread?.forkInfo?.parentImage || null;
           return (
-            <div className="dm-treeNode" key={id} style={{ left: pos.x, top: pos.y }}>
+            <div
+              className="dm-treeNode"
+              key={id}
+              style={{ left: pos.x, top: pos.y }}
+              onPointerDown={(e) => e.stopPropagation()}
+              onPointerMove={(e) => e.stopPropagation()}
+              onPointerUp={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="dm-treeNode__img">
                 {preview ? <img src={preview} alt="preview" loading="lazy" /> : null}
                 {forkImg ? (
@@ -1231,8 +1345,22 @@ const TreeMap = ({ tree, getPreviewImages, isCloud, isLoading, onOpenThread, onF
                   <span>{forkTurn !== null ? `fork@${forkTurn}` : (thread.model || '')}</span>
                 </div>
                 <div className="dm-treeNode__actions">
-                  <button className="primary-button" onClick={() => onOpenThread(thread, isCloud)} disabled={isLoading}>Open</button>
-                  <button className="secondary-button" onClick={() => onForkThread(thread, isCloud)} disabled={isLoading}>Fork</button>
+                  <button
+                    className="dm-treeNode__action"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => { e.stopPropagation(); onOpenThread(thread, isCloud); }}
+                    disabled={isLoading}
+                  >
+                    Open
+                  </button>
+                  <button
+                    className="dm-treeNode__action"
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => { e.stopPropagation(); onForkThread(thread, isCloud); }}
+                    disabled={isLoading}
+                  >
+                    Fork
+                  </button>
                 </div>
               </div>
             </div>
