@@ -172,279 +172,121 @@ const Gallery = ({
     setPreviewIndex(next);
   };
 
-  const ThreadCard = ({ thread, isCloud }) => {
+  /* === Fantasy RPG Components === */
+
+  const RPGThreadCard = ({ thread, isCloud }) => {
     const images = getPreviewImages(thread);
     const title = thread.title || 'Untitled';
-    const date = thread.timestamp ? new Date(thread.timestamp).toLocaleDateString() : '';
     const turnCount = thread.turnCount || (thread.conversation ? thread.conversation.length : '?');
-    const model = thread.model || '';
     const parent = thread?.forkInfo?.parentId;
-    const forkTurn = Number.isFinite(thread?.forkInfo?.parentTurn) ? thread.forkInfo.parentTurn : null;
 
     return (
-      <div className="dm-thread-card">
-        <div className="dm-thread-card__top">
-          <div className="dm-thread-card__title">{title}</div>
-          <div className="dm-thread-card__date">{date}</div>
-        </div>
+      <div className="rpg-card" onClick={() => onOpenThread(thread, isCloud)}>
+        <div className="rpg-card__frame">
+          <div className="rpg-card__imageContainer">
+            {images[0] ? (
+              <img src={images[0]} alt="preview" className="rpg-card__image" loading="lazy" />
+            ) : (
+              <div className="rpg-card__empty">No Preview</div>
+            )}
 
-        <div className="dm-thread-card__thumb">
-          {images[0] ? (
-            <img src={images[0]} alt="thread preview" loading="lazy" />
-          ) : (
-            <div className="dm-thread-card__thumb--empty">No preview</div>
-          )}
-        </div>
-
-        {images.length > 1 && (
-          <div className="dm-thread-card__strip">
-            {images.slice(1).map((src, idx) => (
-              <div className="dm-thread-card__stripItem" key={idx}>
-                <img src={src} alt="preview" loading="lazy" />
-              </div>
-            ))}
+            {/* Medallion / Jewel overlay */}
+            <div className={`rpg-card__jewel ${images[0] ? 'has-image' : ''}`}></div>
           </div>
-        )}
 
-        <div className="dm-thread-card__meta">
-          <span>{turnCount} turns</span>
-          <span>{model}</span>
-        </div>
+          <div className="rpg-card__content">
+            <h3 className="rpg-card__title">{title}</h3>
 
-        {parent && (
-          <div className="dm-thread-card__fork">
-            Forked from {String(parent).slice(0, 8)}…{forkTurn !== null ? ` @ turn ${forkTurn}` : ''}
+            <div className="rpg-card__actions">
+              <button
+                className="rpg-btn-small"
+                onClick={(e) => { e.stopPropagation(); openPreviewAt(normalizedThreads.indexOf(thread)); }}
+              >
+                🔍 Preview
+              </button>
+              <button
+                className="rpg-btn-small"
+                onClick={(e) => { e.stopPropagation(); onForkThread(thread, isCloud); }}
+              >
+                🌱 Fork
+              </button>
+            </div>
           </div>
-        )}
 
-        <div className="dm-thread-card__actions">
-          <button className="primary-button" onClick={() => onOpenThread(thread, isCloud)} disabled={isLoading}>
-            Open
-          </button>
-          <button className="secondary-button" onClick={() => onForkThread(thread, isCloud)} disabled={isLoading}>
-            Fork
-          </button>
-          {!isCloud && onDeleteThread && (
-            <button
-              className="secondary-button"
-              onClick={() => onDeleteThread(thread.id)}
-              disabled={isLoading}
-              title="Delete from local gallery"
-            >
-              🗑
-            </button>
-          )}
+          {/* Decorative Corner Elements (CSS handles these via pseudo-elements mostly, but adding hooks if needed) */}
         </div>
       </div>
     );
   };
 
   return (
-    <div className="dm-gallery">
-      <div className="gallery-header">
-        <div className="dm-gallery__left">
-          <h2 className="gallery-title">🎨 Thread Gallery</h2>
-          <div className="dm-gallery__seg">
+    <div className="rpg-layout">
+      {/* BACKGROUND DECORATIONS handled in CSS on body or layout */}
+
+      {/* HEADER */}
+      <header className="rpg-header">
+        <h1 className="rpg-main-title">Thread Gallery</h1>
+
+        <div className="rpg-header__controls">
+          <div className="rpg-toggle-group">
             <button
-              className={`tab ${activeTab === 'local' ? 'active' : ''}`}
+              className={`rpg-jewel-btn red ${activeTab === 'local' ? 'active' : ''}`}
               onClick={() => setActiveTab('local')}
             >
-              Local ({localGallery.length})
+              Local
             </button>
             <button
-              className={`tab ${activeTab === 'cloud' ? 'active' : ''}`}
+              className={`rpg-jewel-btn blue ${activeTab === 'cloud' ? 'active' : ''}`}
               onClick={() => setActiveTab('cloud')}
             >
               Cloud
             </button>
           </div>
-        </div>
 
-        <div className="dm-gallery__right">
-          <div className="dm-gallery__seg">
-            <button className={`tab ${browseMode === 'wall' ? 'active' : ''}`} onClick={() => setBrowseMode('wall')}>
-              Wall
-            </button>
-            <button className={`tab ${browseMode === 'tree' ? 'active' : ''}`} onClick={() => setBrowseMode('tree')}>
-              Tree
-            </button>
-          </div>
-          <button className="cta-button" onClick={onNewThread} disabled={isLoading}>
-            ✨ New Thread
+          <button className="rpg-scroll-btn" onClick={onNewThread} disabled={isLoading}>
+            <span className="rpg-scroll-text">New Thread</span>
           </button>
         </div>
-      </div>
+      </header>
 
-      <div className="gallery-content">
-        {/* Resume card (current session) */}
-        {currentSession?.conversation?.length > 0 && (
-          <div className="dm-resume">
-            <div className="dm-resume__label">Resume</div>
-            <div className="dm-resume__content">
-              <div className="dm-resume__title">
-                {currentSession.conversation?.[0]?.text?.slice(0, 80) || 'Current session'}
-              </div>
-              <div className="dm-resume__meta">
-                <span>{currentSession.conversation.length} turns</span>
-                <span>{currentSession.model}</span>
-              </div>
-            </div>
-            <div className="dm-resume__actions">
-              <button className="primary-button" onClick={() => onOpenThread({
-                id: currentSession.threadId,
-                threadId: currentSession.threadId,
-                conversation: currentSession.conversation,
-                style: currentSession.style,
-                model: currentSession.model,
-                forkInfo: currentSession.forkInfo,
-                timestamp: currentSession.timestamp,
-                thumbnail: currentSession.conversation?.find(t => t.image)?.image || null
-              }, false)}>
-                Open
-              </button>
-            </div>
-          </div>
-        )}
-
+      {/* MAIN LIST */}
+      <main className="rpg-main">
         {activeTab === 'cloud' && (
-          <div className="cloud-section">
+          <div className="rpg-notice-panel">
             {isConfiguring ? (
               <div className="config-panel">
-                <p>Configure Cloudflare Worker URL to access global gallery.</p>
                 <input
                   type="text"
-                  placeholder="https://your-worker.workers.dev"
+                  placeholder="Worker URL..."
                   value={workerUrlInput}
                   onChange={(e) => setWorkerUrlInput(e.target.value)}
+                  className="rpg-input"
                 />
-                <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', marginTop: '10px' }}>
-                  <button className="primary-button" onClick={handleSaveConfig}>Save</button>
-                  <button className="secondary-button" onClick={() => setIsConfiguring(false)}>Cancel</button>
-                </div>
+                <button className="rpg-btn-small" onClick={handleSaveConfig}>Save</button>
               </div>
             ) : (
-              <>
-                <div className="cloud-controls">
-                  <button className="secondary-button small" onClick={() => setIsConfiguring(true)}>⚙️ Config</button>
-                  <button className="secondary-button small" onClick={loadCloudGallery}>🔄 Refresh</button>
-                </div>
-                {loadingCloud ? (
-                  <div className="loading">Loading cloud threads...</div>
-                ) : null}
-              </>
+              <div style={{ textAlign: 'center', marginBottom: 10 }}>
+                <button className="rpg-btn-text" onClick={() => setIsConfiguring(true)}>⚙️ Config</button>
+                <button className="rpg-btn-text" onClick={loadCloudGallery}>🔄 Refresh</button>
+              </div>
             )}
           </div>
         )}
 
-        {/* Swipeable wall */}
         {browseMode === 'wall' && (
-          <div className="dm-wall">
-            <div className="dm-wall__hint">
-              A “wall” of first images. Tap to preview. Swipe left/right in preview to browse threads.
-            </div>
-
-            <div className="dm-masonry" role="list">
-              {normalizedThreads.length === 0 ? (
-                <div className="empty-state">No threads here yet.</div>
-              ) : (
-                normalizedThreads.map((t, idx) => {
-                  const frames = getEvolutionFrames(t, 5);
-
-                  const forkTurn = Number.isFinite(t?.forkInfo?.parentTurn) ? t.forkInfo.parentTurn : null;
-                  let cover = frames[0];
-                  let vignette = null;
-
-                  // For forks, show first post-fork image as cover + a vignette of the latest image.
-                  if (forkTurn !== null && t?.conversation && Array.isArray(t.conversation)) {
-                    const imgs = t.conversation
-                      .map((turn, turnIdx) => ({ idx: turnIdx, img: turn?.image }))
-                      .filter(x => !!x.img);
-
-                    const postFork = imgs.filter(x => x.idx > forkTurn).map(x => x.img);
-                    const latest = imgs.length ? imgs[imgs.length - 1].img : null;
-
-                    if (postFork.length) cover = postFork[0];
-                    if (latest && latest !== cover) vignette = latest;
-                  }
-
-                  return (
-                    <div
-                      key={t.id}
-                      className="dm-tile"
-                      role="listitem"
-                      onClick={() => openPreviewAt(idx)}
-                    >
-                      <div className="dm-tile__thumb">
-                        {cover ? (
-                          <img src={cover} alt={t.title || 'thread'} loading="lazy" />
-                        ) : (
-                          <div className="dm-tile__empty">No preview</div>
-                        )}
-
-                        {vignette ? (
-                          <div className="dm-tile__vignette" aria-label="Latest image vignette">
-                            <img src={vignette} alt="" loading="lazy" />
-                          </div>
-                        ) : null}
-                      </div>
-
-                      {frames.length > 1 && (
-                        <div className="dm-tile__strip" aria-hidden="true">
-                          {frames.slice(1).map((src, sidx) => (
-                            <div className="dm-tile__stripItem" key={sidx}>
-                              <img src={src} alt="" loading="lazy" />
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      <div className="dm-tile__overlay">
-                        <div className="dm-tile__title">{t.title || 'Untitled'}</div>
-                        <div className="dm-tile__meta">
-                          <span>{t.turnCount || (t.conversation ? t.conversation.length : '?')} turns</span>
-                          {t?.forkInfo?.parentId ? <span className="dm-tile__fork">fork</span> : null}
-                        </div>
-                        <div className="dm-tile__actionsRow">
-                          <button
-                            type="button"
-                            className="dm-tile__action"
-                            onClick={(e) => { e.stopPropagation(); openPreviewAt(idx); }}
-                          >
-                            👁 Preview
-                          </button>
-                          <button
-                            type="button"
-                            className="dm-tile__action"
-                            onClick={(e) => { e.stopPropagation(); onForkThread(t, activeTab === 'cloud'); }}
-                          >
-                            🌱 Fork
-                          </button>
-                          {activeTab === 'local' && onDeleteThread ? (
-                            <button
-                              type="button"
-                              className="dm-tile__action"
-                              onClick={(e) => { e.stopPropagation(); onDeleteThread(t.id); }}
-                              title="Delete from local gallery"
-                            >
-                              🗑
-                            </button>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+          <div className="rpg-grid">
+            {normalizedThreads.map(t => (
+              <RPGThreadCard key={t.id} thread={t} isCloud={activeTab === 'cloud'} />
+            ))}
+            {normalizedThreads.length === 0 && (
+              <div className="rpg-empty">No scrolls found in the archives.</div>
+            )}
           </div>
         )}
 
-        {/* Tree mode */}
         {browseMode === 'tree' && (
-          <div className="dm-tree">
-            {tree.roots.length === 0 ? (
-              <div className="empty-state">No threads to show.</div>
-            ) : (
+          <div className="rpg-tree-container">
+            {tree.roots.length === 0 ? <div className="rpg-empty">Empty Archive</div> :
               <TreeMap
                 tree={tree}
                 getPreviewImages={getPreviewImages}
@@ -457,10 +299,31 @@ const Gallery = ({
                 zoom={treeZoom}
                 setZoom={setTreeZoom}
               />
-            )}
+            }
           </div>
         )}
-      </div>
+      </main>
+
+      {/* BOTTOM NAV */}
+      <nav className="rpg-nav-bar">
+        <button className="rpg-nav-item active">
+          <span className="rpg-icon">🏠</span>
+        </button>
+        <button className="rpg-nav-item">
+          <span className="rpg-icon">🔍</span>
+        </button>
+        {/* Toggle View Mode via Nav item */}
+        <button
+          className={`rpg-nav-center ${browseMode === 'tree' ? 'active' : ''}`}
+          onClick={() => setBrowseMode(browseMode === 'wall' ? 'tree' : 'wall')}
+        >
+          <span className="rpg-icon-large">Wait</span> {/* Will execute logic, maybe icon is Y-shape */}
+          <span className="rpg-icon-large">{browseMode === 'wall' ? '🌿' : '🖼️'}</span>
+        </button>
+        <button className="rpg-nav-item">
+          <span className="rpg-icon">👤</span>
+        </button>
+      </nav>
 
       {/* Fullscreen preview (swipeable) */}
       {previewOpen && normalizedThreads[previewIndex] && (
@@ -476,7 +339,6 @@ const Gallery = ({
           onFork={() => onForkThread(normalizedThreads[previewIndex], activeTab === 'cloud')}
         />
       )}
-
     </div>
   );
 };
