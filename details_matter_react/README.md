@@ -4,11 +4,13 @@ A React web application that demonstrates how generative AI models preserve visu
 
 ## Features
 
-- **Client-side Google AI integration**: All API calls happen in the browser using Gemini 2.5 Flash Image Preview with @google/genai SDK
-- **Local storage**: No server-side data storage - everything stays in your browser
+- **Client-side Google AI integration**: All API calls happen in the browser using Gemini 2.5 Flash with @google/genai SDK
+- **Local-first storage**: Sessions saved to browser localStorage by default
+- **Cloud sync (optional)**: Publish threads to a shared Cloudflare R2 gallery
 - **Iterative image generation**: Watch how AI preserves single visual details across generations
 - **Art style selection**: Choose from 20+ different art styles
-- **Session management**: Save and load your creative sessions
+- **Gallery views**: Browse threads as a **Wall** (masonry grid) or **Tree** (fork visualization)
+- **Forking**: Branch off from any point in any thread (local or cloud)
 - **Responsive design**: Works on desktop and mobile devices
 
 ## Setup Instructions
@@ -26,7 +28,22 @@ npm install
 2. Create a new API key
 3. Copy the API key (use a throwaway/dev key for testing)
 
-### 3. Start the Development Server
+### 3. (Optional) Set up Google Sign-In
+
+To allow users to sign in with their Google account instead of pasting an API key:
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one
+3. Go to **APIs & Services > Credentials**
+4. Create **OAuth Client ID** (Application type: Web application)
+5. Add Authorized JavaScript origins: `http://localhost:3000` (and your production URL)
+6. Copy the **Client ID**
+7. Set the Client ID in `.env` file (create one in root `details_matter_react/`):
+   ```
+   REACT_APP_GOOGLE_CLIENT_ID=your-client-id-here
+   ```
+
+### 4. Start the Development Server
 
 ```bash
 npm start
@@ -54,9 +71,56 @@ The app will open in your browser at `http://localhost:3000`
 
 - **Frontend**: React with hooks for state management
 - **AI Integration**: Direct client-side calls to Google Gemini API
-- **Storage**: Browser localStorage for session persistence
+- **Local Storage**: Browser localStorage for session persistence
+- **Cloud Storage**: Cloudflare R2 (blobs) + KV (metadata index)
 - **Styling**: CSS with responsive design
-- **Images**: Blob URLs for generated images (no server storage)
+- **Images**: Compressed to 720p WebP before storage
+
+## Cloud Sync (Optional)
+
+The app supports publishing threads to a shared cloud gallery using Cloudflare Workers + R2.
+
+### Worker Deployment
+
+1. **Install Wrangler** (Cloudflare CLI):
+   ```bash
+   npm install -g wrangler
+   wrangler login
+   ```
+
+2. **Create Resources** in Cloudflare Dashboard:
+   - KV Namespace (e.g., `GALLERY_KV`)
+   - R2 Bucket (e.g., `details-matter-threads`)
+
+3. **Create `wrangler.toml`** in `worker/`:
+   ```toml
+   name = "details-matter-gallery"
+   main = "worker.js"
+   compatibility_date = "2024-01-01"
+
+   [[kv_namespaces]]
+   binding = "GALLERY_KV"
+   id = "your-kv-namespace-id"
+
+   [[r2_buckets]]
+   binding = "GALLERY_BUCKET"
+   bucket_name = "details-matter-threads"
+   ```
+
+4. **Deploy**:
+   ```bash
+   cd worker
+   wrangler deploy
+   ```
+
+5. **Configure in App**: Enter your Worker URL in the Cloud tab settings.
+
+### How It Works
+
+- **Metadata** (title, timestamp, thumbnail) → stored in **KV** for fast listing
+- **Full thread data** (with images) → stored in **R2** for cost-effective blob storage
+- Images are compressed to **720p WebP** client-side before upload
+
 
 ## Security Notes
 

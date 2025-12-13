@@ -109,29 +109,12 @@ export const fetchAvailableModels = async (apiKey) => {
   }
 };
 
-export const generateContent = async (prompt, context = "", previousImage = null, style = "", model = DEFAULT_MODEL_ID) => {
-  if (!genAI) {
-    throw new Error('Google AI client not initialized. Please set your API key first.');
-  }
-
-  console.log('🚀 Starting content generation with API key:', currentApiKey ? currentApiKey.substring(0, 8) + '...' : 'NO KEY');
-
-  // Prevent concurrent generateContent calls from this module
-  if (generationInProgress) {
-    throw new Error('A generation request is already in progress. Please wait for it to complete.');
-  }
-
-  try {
-    generationInProgress = true;
-    // Build the full prompt
+const prepareContents = async (prompt, context, previousImage, style) => {
     let fullPrompt = context ? `${context}\n\n${prompt}` : prompt;
     if (style) {
       fullPrompt += `\nStyle: ${style}.`;
     }
 
-    // Prepare contents for the API call.
-    // @google/genai v0.3.x accepts either a string OR a list of {role, parts}.
-    // We use role/parts so multimodal works consistently.
     let contents;
 
     if (previousImage) {
@@ -182,6 +165,36 @@ export const generateContent = async (prompt, context = "", previousImage = null
     } else {
       contents = [{ role: 'user', parts: [{ text: fullPrompt }] }];
     }
+    return contents;
+};
+
+const performGenerateCall = async (model, contents) => {
+    if (genAI) {
+        return await genAI.models.generateContent({
+            model,
+            contents,
+        });
+    } else {
+        throw new Error("No API Key available");
+    }
+};
+
+export const generateContent = async (prompt, context = "", previousImage = null, style = "", model = DEFAULT_MODEL_ID) => {
+  if (!genAI) {
+    throw new Error('Google AI client not initialized. Please set your API key first.');
+  }
+
+  console.log('🚀 Starting content generation with API key:', currentApiKey ? currentApiKey.substring(0, 8) + '...' : 'NO KEY');
+
+  // Prevent concurrent generateContent calls from this module
+  if (generationInProgress) {
+    throw new Error('A generation request is already in progress. Please wait for it to complete.');
+  }
+
+  try {
+    generationInProgress = true;
+    
+    const contents = await prepareContents(prompt, context, previousImage, style);
 
     console.log('Contents:', contents);
 
@@ -203,24 +216,23 @@ export const generateContent = async (prompt, context = "", previousImage = null
 
     console.log(`📦 Outgoing request size ≈ ${(requestBytes/1024).toFixed(1)} KB` + (imageDecodedBytes > 0 ? ` | images (decoded) ≈ ${(imageDecodedBytes/1024).toFixed(1)} KB` : ''));
 
-    // Generate content with image modality (matching documentation exactly)
-    const response = await genAI.models.generateContent({
-      model,
-      contents: contents,
-    });
+    // Generate content
+    const response = await performGenerateCall(model, contents);
 
     // Extract text and image from the response.
     // In @google/genai v0.3.x, response is a GenerateContentResponse with response.candidates.
     const candidates = response?.candidates || response?.response?.candidates || [];
     const parts = candidates?.[0]?.content?.parts || [];
 
-    let text = response?.text || null;
+    let text = response?.text || null; // SDK helper
+    if (!text && candidates.length > 0) {
+        // Manual extraction if SDK helper not present (e.g. raw fetch response)
+        text = parts.map(p => p.text || '').join('');
+    }
+    
     let image = null;
 
     for (const part of parts) {
-      if (part?.text) {
-        text = (text || '') + part.text;
-      }
       if (part?.inlineData?.data && part?.inlineData?.mimeType) {
         const imageData = part.inlineData.data;
         const mimeType = part.inlineData.mimeType;
@@ -233,10 +245,8 @@ export const generateContent = async (prompt, context = "", previousImage = null
       try {
         console.log('No image in initial response, attempting image-only generation...');
 
-        const imageOnlyResponse = await genAI.models.generateContent({
-          model,
-          contents: [{ role: 'user', parts: [{ text }] }],
-        });
+        const imageOnlyContents = [{ role: 'user', parts: [{ text }] }];
+        const imageOnlyResponse = await performGenerateCall(model, imageOnlyContents);
 
         const imageCandidates = imageOnlyResponse?.candidates || imageOnlyResponse?.response?.candidates || [];
         const imageParts = imageCandidates?.[0]?.content?.parts || [];

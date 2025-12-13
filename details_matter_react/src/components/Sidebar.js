@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AVAILABLE_MODELS, fetchAvailableModels } from '../utils/googleAI';
+import { generateGif } from '../utils/gifGenerator';
 
 const Sidebar = ({
   apiKey,
@@ -20,13 +21,16 @@ const Sidebar = ({
   onOpenGallery,
   onPublishCloud,
   onNewThread,
-  onAddToGallery
+  onAddToGallery,
+  gallery
 }) => {
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [overrideKeyInput, setOverrideKeyInput] = useState('');
   const [showOverride, setShowOverride] = useState(false);
   const [availableModels, setAvailableModels] = useState(AVAILABLE_MODELS);
   const [loadingModels, setLoadingModels] = useState(false);
+  const [isGeneratingGif, setIsGeneratingGif] = useState(false);
+  const [gifProgress, setGifProgress] = useState(0);
 
   // Fetch available models when API key changes
   useEffect(() => {
@@ -47,7 +51,7 @@ const Sidebar = ({
     loadModels();
     // We intentionally don't include onModelChange/model in deps to avoid loops.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isApiKeySet, apiKey]); // Removed model from deps to avoid loop
+  }, [isApiKeySet, apiKey]); 
 
   const handleApiKeySubmit = (e) => {
     e.preventDefault();
@@ -98,6 +102,29 @@ const Sidebar = ({
     URL.revokeObjectURL(url);
   };
 
+  const handleGifExport = async () => {
+    if (isGeneratingGif) return;
+    setIsGeneratingGif(true);
+    setGifProgress(0);
+    try {
+      const blob = await generateGif(conversation, (p) => setGifProgress(p));
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `details-matter-${new Date().toISOString().slice(0, 10)}.gif`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("GIF generation failed", err);
+      alert("Failed to generate GIF: " + err.message);
+    } finally {
+      setIsGeneratingGif(false);
+      setGifProgress(0);
+    }
+  };
+
   // Import functionality
   const handleImport = (e) => {
     const file = e.target.files[0];
@@ -126,31 +153,44 @@ const Sidebar = ({
     <div className="sidebar">
       <h2>⚙️ Settings</h2>
 
-      {/* API Key Section */}
+      {/* API Key / Auth Section */}
       <div className="section">
-        <h3>API Key</h3>
+        <h3>Authentication</h3>
 
         {!isApiKeySet ? (
           <>
-            <div className="warning">
-              <strong>Security Notice:</strong> Keys are stored locally in your browser only.
+            <div className="warning" style={{ marginBottom: '12px' }}>
+              <strong>Note:</strong> You need your own Gemini API Key.
             </div>
 
-            <form onSubmit={handleApiKeySubmit}>
+             <a 
+                href="https://aistudio.google.com/app/apikey" 
+                target="_blank" 
+                rel="noreferrer"
+                className="secondary-button"
+                style={{ width: '100%', marginBottom: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center', textDecoration: 'none', background: 'var(--background-secondary)', boxSizing: 'border-box' }}
+            >
+                🔑 Get API Key (Google AI Studio)
+            </a>
+
+            <div style={{ textAlign: 'center', margin: '12px 0', fontSize: '0.8em', color: '#666' }}>THEN</div>
+
+            <form onSubmit={handleApiKeySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: 0 }}>
               <input
                 type="password"
                 placeholder="Paste Gemini API Key"
                 value={apiKeyInput}
                 onChange={(e) => setApiKeyInput(e.target.value)}
                 required
+                style={{ width: '100%', boxSizing: 'border-box', margin: 0 }}
               />
-              <button type="submit" className="primary-button" style={{ width: '100%' }}>Set Key</button>
+              <button type="submit" className="primary-button" style={{ width: '100%', margin: 0 }}>Set Key</button>
             </form>
           </>
         ) : (
           <>
             <div className="success">
-              ✅ API Key Active
+                ✅ API Key Active
             </div>
 
             {!showOverride ? (
@@ -162,28 +202,30 @@ const Sidebar = ({
                 Change API Key
               </button>
             ) : (
-              <form onSubmit={handleOverrideSubmit} style={{ marginTop: '12px' }}>
-                <input
-                  type="password"
-                  placeholder="New API Key"
-                  value={overrideKeyInput}
-                  onChange={(e) => setOverrideKeyInput(e.target.value)}
-                  required
-                  style={{ marginBottom: '8px' }}
-                />
-                <button type="submit" className="primary-button" style={{ width: '100%', marginBottom: '8px' }}>Update Key</button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowOverride(false);
-                    setOverrideKeyInput('');
-                  }}
-                  className="secondary-button"
-                  style={{ width: '100%', justifyContent: 'center' }}
-                >
-                  Cancel
-                </button>
-              </form>
+              <div style={{ marginTop: '12px' }}>
+                <form onSubmit={handleOverrideSubmit}>
+                  <input
+                    type="password"
+                    placeholder="New API Key"
+                    value={overrideKeyInput}
+                    onChange={(e) => setOverrideKeyInput(e.target.value)}
+                    required
+                    style={{ marginBottom: '8px' }}
+                  />
+                  <button type="submit" className="primary-button" style={{ width: '100%', marginBottom: '8px' }}>Update Key</button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowOverride(false);
+                      setOverrideKeyInput('');
+                    }}
+                    className="secondary-button"
+                    style={{ width: '100%', justifyContent: 'center' }}
+                  >
+                    Cancel
+                  </button>
+                </form>
+              </div>
             )}
           </>
         )}
@@ -247,7 +289,7 @@ const Sidebar = ({
             ))}
           </select>
           <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '6px' }}>
-            {availableModels.length > 3 ? 'Models loaded from your API key.' : 'Flash is faster/cheaper. Pro is higher quality.'}
+            {availableModels.length > 3 ? 'Models loaded from your key.' : 'Flash is faster/cheaper. Pro is higher quality.'}
           </div>
         </div>
       )}
@@ -274,9 +316,18 @@ const Sidebar = ({
         <div className="section">
           <h3>💾 Save / Load</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <button
+              onClick={handleGifExport}
+              className="primary-button"
+              disabled={isGeneratingGif}
+              style={{ background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)', border: 'none' }}
+            >
+              {isGeneratingGif ? `🎬 Generating GIF (${Math.round(gifProgress * 100)}%)...` : '🎬 Export as GIF'}
+            </button>
+
             <button 
               onClick={handleExport} 
-              className="primary-button"
+              className="primary-button" 
               style={{ background: 'var(--success-bg)', color: 'var(--success-text)', border: '1px solid var(--success-text)' }}
             >
               📥 Export Session (JSON)

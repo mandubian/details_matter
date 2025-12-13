@@ -106,7 +106,8 @@ body::before {
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   box-shadow: var(--shadow-md);
-  overflow: hidden;
+  overflow-y: auto;
+  max-height: calc(100vh - 48px);
 }
 
 .sidebar::before {
@@ -192,83 +193,136 @@ option {
 
 /* Modern Buttons */
 .primary-button {
-  background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-hover) 100%);
+  background: linear-gradient(135deg, var(--primary-color) 0%, #2563eb 100%);
   color: white;
-  border: none;
-  padding: 12px 22px;
-  border-radius: var(--radius);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  padding: 12px 24px;
+  border-radius: 14px;
   font-weight: 650;
   font-size: 0.95rem;
   cursor: pointer;
-  box-shadow: 0 10px 30px var(--primary-glow);
-  transition: transform 0.18s ease, box-shadow 0.25s ease, filter 0.2s ease;
+  box-shadow: 
+    0 8px 20px -6px var(--primary-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   letter-spacing: 0.01em;
+  backdrop-filter: blur(4px);
+  position: relative;
+  overflow: hidden;
+}
+
+.primary-button::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
 .primary-button:hover {
-  transform: translateY(-1px) translateZ(0);
-  filter: brightness(1.04);
-  box-shadow: 0 14px 36px var(--primary-glow);
+  transform: translateY(-2px) scale(1.02);
+  filter: brightness(1.1);
+  box-shadow: 
+    0 14px 40px -10px var(--primary-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.primary-button:hover::after {
+  opacity: 1;
 }
 
 .primary-button:active {
-  transform: translateY(0);
-  box-shadow: 0 6px 14px var(--primary-glow);
+  transform: translateY(0) scale(0.98);
+  box-shadow: 
+    0 4px 14px -4px var(--primary-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 .primary-button:disabled {
   background: #2f3548;
   color: #7c839b;
+  border-color: rgba(255, 255, 255, 0.05);
   box-shadow: none;
   cursor: not-allowed;
   transform: none;
-  opacity: 0.8;
+  opacity: 0.7;
 }
 
 .secondary-button {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   color: var(--text-secondary);
   padding: 10px 18px;
-  border-radius: var(--radius);
+  border-radius: 12px;
   font-size: 0.9rem;
   font-weight: 550;
   cursor: pointer;
   transition: all 0.2s ease;
+  backdrop-filter: blur(4px);
 }
 
 .secondary-button:hover {
-  border-color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.25);
   color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
 .danger-button {
   background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
   color: white;
-  border: none;
-  padding: 11px 20px;
-  border-radius: var(--radius);
+  border: 1px solid rgba(255,255,255,0.2);
+  padding: 12px 22px;
+  border-radius: 14px;
   font-weight: 650;
   font-size: 0.95rem;
   cursor: pointer;
-  box-shadow: 0 10px 30px rgba(239, 68, 68, 0.35);
-  transition: transform 0.18s ease, box-shadow 0.25s ease, filter 0.2s ease;
+  box-shadow: 
+    0 8px 20px -6px rgba(239, 68, 68, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  letter-spacing: 0.01em;
+  backdrop-filter: blur(4px);
+  position: relative;
+  overflow: hidden;
+}
+
+.danger-button::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 100%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
 
 .danger-button:hover {
-  transform: translateY(-1px);
-  filter: brightness(1.03);
-  box-shadow: 0 14px 36px rgba(239, 68, 68, 0.4);
+  transform: translateY(-2px) scale(1.02);
+  filter: brightness(1.1);
+  box-shadow: 
+    0 14px 40px -10px rgba(239, 68, 68, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.danger-button:hover::after {
+  opacity: 1;
 }
 
 .danger-button:active {
-  transform: translateY(0);
-  box-shadow: 0 8px 18px rgba(239, 68, 68, 0.3);
+  transform: translateY(0) scale(0.98);
+  box-shadow: 
+    0 4px 14px -4px rgba(239, 68, 68, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
 
 /* Sidebar button overrides */

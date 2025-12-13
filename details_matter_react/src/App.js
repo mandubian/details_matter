@@ -76,6 +76,11 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   
   const MAX_GALLERY_ITEMS = 20;
+  const AUTO_SNAPSHOT_DEBOUNCE_MS = 1200;
+  const [autoSnapshotEnabled] = useState(true);
+  const [isAutoSaving, setIsAutoSaving] = useState(false);
+  const [autoSaveError, setAutoSaveError] = useState(null);
+  const [lastSnapshotSig, setLastSnapshotSig] = useState('');
 
   // Initialize Google AI if API key was loaded
   useEffect(() => {
@@ -132,8 +137,12 @@ function App() {
   useEffect(() => {
     if (apiKey) {
       localStorage.setItem('details_matter_api_key', apiKey);
+    } else {
+      localStorage.removeItem('details_matter_api_key');
     }
   }, [apiKey]);
+
+  // Removed accessToken persistence logic
 
   useEffect(() => {
     // Only save non-empty conversations (prevents clearing on initial mount)
@@ -270,66 +279,193 @@ function App() {
     }
   };
 
-  // Handle Local Gallery Save (Compressed)
+  const buildGalleryEntry = async ({ id, conversation: conv, style: s, model: m, forkInfo: f }) => {
+    const compressedConv = await compressConversation(conv);
+    const title = conv?.[0]?.text?.slice(0, 80) || 'Untitled Thread';
+    return {
+      id,
+      title,
+      conversation: compressedConv,
+      style: s,
+      model: m,
+      timestamp: new Date().toISOString(),
+      forkInfo: f || null,
+      threadId: id,
+      thumbnail: compressedConv.find(t => t.image)?.image || null
+    };
+  };
+
+  const saveThreadToLocalGallery = async ({ id, conv, s, m, f, silent = false }) => {
+    // Avoid saving empty
+    if (!conv || conv.length === 0) return;
+    try {
+      const entry = await buildGalleryEntry({ id, conversation: conv, style: s, model: m, forkInfo: f });
+      setGallery(prev => {
+        const deduped = prev.filter(e => e.id !== id);
+        return [entry, ...deduped].slice(0, MAX_GALLERY_ITEMS);
+      });
+      if (!silent) {
+        setSuccess('Saved to Local Gallery (Compressed).');
+        setTimeout(() => setSuccess(null), 2500);
+      }
+    } catch (err) {
+      console.error('Gallery save failed:', err);
+      if (!silent) setError('Failed to save to gallery.');
+      throw err;
+    }
+  };
+
+  // Manual action in settings
   const handleAddToGallery = async () => {
     setIsLoading(true);
     try {
-      // Compress for storage
-      const compressedConv = await compressConversation(conversation);
-      
-      const title = conversation[0]?.text?.slice(0, 80) || 'Untitled Thread';
-      const entry = {
-        id: threadId,
-        title,
-        conversation: compressedConv,
-        style,
-        model,
-        timestamp: new Date().toISOString(),
-        forkInfo: forkInfo || null,
-        threadId,
-        thumbnail: compressedConv.find(t => t.image)?.image || null
-      };
-
-      setGallery(prev => {
-        const deduped = prev.filter(e => e.id !== threadId);
-        const next = [entry, ...deduped].slice(0, MAX_GALLERY_ITEMS);
-        return next;
-      });
-      setSuccess('Saved to Local Gallery (Compressed).');
-      setTimeout(() => setSuccess(null), 3000);
-    } catch (err) {
-      console.error('Gallery save failed:', err);
-      setError('Failed to save to gallery.');
+      await saveThreadToLocalGallery({ id: threadId, conv: conversation, s: style, m: model, f: forkInfo, silent: false });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleOpenThread = async (entry, isCloud = false) => {
+  const handleDeleteFromGallery = (id) => {
+    if (!id) return;
+    const ok = window.confirm('Delete this thread from local gallery? This cannot be undone.');
+    if (!ok) return;
+    setGallery(prev => prev.filter(e => e.id !== id));
+    setSuccess('Deleted from local gallery.');
+    setTimeout(() => setSuccess(null), 2000);
+  };
+
+  // Auto-snapshot current thread into local gallery (compressed)
+  useEffect(() => {
+    if (!autoSnapshotEnabled) return;
+    if (!threadId || !conversation || conversation.length === 0) return;
+    // Only snapshot after we have at least one AI image or some meaningful progress
+    const sig = `${threadId}:${conversation.length}:${conversation[conversation.length - 1]?.id || ''}`;
+    if (sig === lastSnapshotSig) return;
+
+    const t = setTimeout(async () => {
+      try {
+        setIsAutoSaving(true);
+        setAutoSaveError(null);
+        await saveThreadToLocalGallery({ id: threadId, conv: conversation, s: style, m: model, f: forkInfo, silent: true });
+        setLastSnapshotSig(sig);
+      } catch (err) {
+        setAutoSaveError(err?.message || String(err));
+      } finally {
+        setIsAutoSaving(false);
+      }
+    }, AUTO_SNAPSHOT_DEBOUNCE_MS);
+
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoSnapshotEnabled, threadId, conversation, style, model, forkInfo]);
+
+  // --- Routing & Navigation Logic ---
+
+  const loadThread = async (id, isCloud = false) => {
     try {
-      let data = entry;
+      let data;
       if (isCloud) {
         setIsLoading(true);
-        data = await fetchThread(entry.id);
+        data = await fetchThread(id);
         setIsLoading(false);
+      } else {
+        data = gallery.find(e => e.id === id);
       }
 
-      if (data.conversation) {
+      if (data && data.conversation) {
         setConversation(data.conversation);
         setCurrentTurn(data.conversation.length);
         setStyle(data.style || style);
         setModel(data.model || model);
-        setThreadId(data.threadId || `thread-${Date.now()}`);
+        setThreadId(data.threadId || data.id || `thread-${Date.now()}`);
         setForkInfo(data.forkInfo || null);
         
         setView('editor');
-        setSuccess('Thread loaded successfully.');
-        setTimeout(() => setSuccess(null), 3000);
+        // setSuccess('Thread loaded successfully.');
+      } else if (!isCloud) {
+         // If not found in gallery, check if it matches current threadId (already loaded)
+         if (id === threadId) {
+            if (view !== 'editor') setView('editor');
+            return;
+         }
+         console.warn("Thread not found locally:", id);
       }
     } catch (err) {
       console.error('Load failed:', err);
       setError('Failed to load thread.');
       setIsLoading(false);
+    }
+  };
+
+  const resetThread = () => {
+    setConversation([]);
+    setCurrentTurn(0);
+    const newId = `thread-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`;
+    setThreadId(newId);
+    setForkInfo(null);
+    setInitialImage(null);
+    
+    // Clear persistence keys
+    localStorage.removeItem('details_matter_conversation');
+    localStorage.removeItem('details_matter_current_turn');
+    localStorage.removeItem('details_matter_thread_id');
+    localStorage.removeItem('details_matter_fork_info');
+    
+    setView('editor');
+    return newId;
+  };
+
+  useEffect(() => {
+    const handleHashChange = async () => {
+      const hash = window.location.hash;
+      
+      if (!hash || hash === '#/' || hash === '#/gallery') {
+        if (view !== 'gallery') setView('gallery');
+        return;
+      }
+      
+      if (hash === '#/new') {
+        const newId = resetThread();
+        window.location.replace(`#/thread/${newId}`);
+        return;
+      }
+
+      const threadMatch = hash.match(/^#\/thread\/(.+)$/);
+      if (threadMatch) {
+        const id = threadMatch[1];
+        if (id === threadId && conversation.length > 0) {
+          if (view !== 'editor') setView('editor');
+          return;
+        }
+        await loadThread(id, false);
+        return;
+      }
+
+      const cloudMatch = hash.match(/^#\/cloud\/(.+)$/);
+      if (cloudMatch) {
+        const id = cloudMatch[1];
+        if (id === threadId) {
+          if (view !== 'editor') setView('editor');
+          return;
+        }
+        await loadThread(id, true);
+        return;
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    // Handle initial load
+    handleHashChange();
+    
+    return () => window.removeEventListener('hashchange', handleHashChange);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gallery, threadId, view]);
+
+  const handleOpenThread = (entry, isCloud = false) => {
+    if (isCloud) {
+      window.location.hash = `#/cloud/${entry.id}`;
+    } else {
+      window.location.hash = `#/thread/${entry.id}`;
     }
   };
 
@@ -351,12 +487,15 @@ function App() {
         setCurrentTurn(data.conversation.length);
         setStyle(data.style || style);
         setModel(data.model || model);
-        setThreadId(`thread-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`);
+        const newThreadId = `thread-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`;
+        setThreadId(newThreadId);
         setForkInfo({ parentId, parentTurn, parentImage });
 
         setView('editor');
         setSuccess('Fork created. You can now continue from this thread.');
         setTimeout(() => setSuccess(null), 3000);
+        
+        window.location.hash = `#/thread/${newThreadId}`;
       }
     } catch (err) {
       console.error('Fork failed:', err);
@@ -381,6 +520,11 @@ function App() {
       }
     }
 
+    // Before mutating the current thread into a fork, snapshot the full parent into gallery
+    // so users don't lose it if they never manually saved.
+    saveThreadToLocalGallery({ id: threadId, conv: conversation, s: style, m: model, f: forkInfo, silent: true })
+      .catch(() => {});
+
     const newConversation = conversation.slice(0, idx + 1);
     const newThreadId = `thread-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 
@@ -392,6 +536,8 @@ function App() {
 
     setSuccess(`Fork created from turn ${idx}. You can now continue from this branch.`);
     setTimeout(() => setSuccess(null), 3000);
+    
+    window.location.hash = `#/thread/${newThreadId}`;
   };
 
   const handleNewThread = () => {
@@ -399,21 +545,14 @@ function App() {
     if (conversation.length > 0) {
       if (!window.confirm('Start a new thread? Unsaved progress will be lost.')) return;
     }
+
+    // Snapshot the current thread first, so we don't lose it
+    if (conversation.length > 0) {
+      saveThreadToLocalGallery({ id: threadId, conv: conversation, s: style, m: model, f: forkInfo, silent: true })
+        .catch(() => {});
+    }
     
-    // Reset state but don't necessarily reload page if we handle state cleanly
-    setConversation([]);
-    setCurrentTurn(0);
-    setThreadId(`thread-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`);
-    setForkInfo(null);
-    setInitialImage(null);
-    
-    // Clear persistence keys
-    localStorage.removeItem('details_matter_conversation');
-    localStorage.removeItem('details_matter_current_turn');
-    localStorage.removeItem('details_matter_thread_id');
-    localStorage.removeItem('details_matter_fork_info');
-    
-    setView('editor');
+    window.location.hash = '#/new';
   };
 
   // True full-bleed gallery: do NOT render under `.app` which is max-width constrained.
@@ -434,6 +573,7 @@ function App() {
         onNewThread={handleNewThread}
         onOpenThread={(t, isCloud) => handleOpenThread(t, isCloud)}
         onForkThread={(t, isCloud) => handleForkThread(t, isCloud)}
+        onDeleteThread={(id) => handleDeleteFromGallery(id)}
       />
     );
   }
@@ -454,7 +594,7 @@ function App() {
     error,
     success,
     onClearMessages: clearMessages,
-    onOpenGallery: () => setView('gallery'),
+    onOpenGallery: () => window.location.hash = '#/gallery',
     onPublishCloud: handlePublishCloud,
     onAddToGallery: handleAddToGallery,
     gallery,
@@ -472,7 +612,7 @@ function App() {
         </div>
         <button
           className="secondary-button"
-          onClick={() => setView('gallery')}
+          onClick={() => window.location.hash = '#/gallery'}
           style={{ marginLeft: '20px' }}
         >
           🏠 Home / Gallery
@@ -521,7 +661,7 @@ function App() {
             {...sidebarProps}
             onOpenGallery={() => {
               setShowSettings(false);
-              setView('gallery');
+              window.location.hash = '#/gallery';
             }}
           />
         </SettingsSheet>
@@ -531,4 +671,3 @@ function App() {
 }
 
 export default App;
-
