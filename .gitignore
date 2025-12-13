@@ -22,3 +22,14 @@ details_matter_react/node_modules/
 details_matter_react/build/
 details_matter_react/node_modules/.cache/
 details_matter_react/.eslintcache
+details_matter_react/.env
+
+# Root-level node artifacts
+node_modules/
+package-lock.json
+
+# Python lock files
+uv.lock
+
+# Streamlit local config
+.streamlit/
