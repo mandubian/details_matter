@@ -229,9 +229,11 @@ body {
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 40px;
   width: 100%;
-  max-width: 1700px; /* Matches expanded background minus margins */
+  max-width: 1700px;
+  /* Matches expanded background minus margins */
   margin: 0 auto;
-  padding: 0 40px; /* Reduced slightly to fit more content */
+  padding: 0 40px;
+  /* Reduced slightly to fit more content */
   box-sizing: border-box;
 }
 
@@ -1251,98 +1253,137 @@ label {
 
 /* === PARCHMENT TURN CARDS === */
 .conversation {
-  max-width: 800px;
+  max-width: 900px;
   margin: 0 auto;
   padding: 20px;
   padding-bottom: 140px;
-  /* Space for floating bar */
 }
 
+/* Turn card - Art Nouveau frame */
 .turn {
-  background: linear-gradient(to bottom, #f5f0e6 0%, #e8dfd0 100%);
-  border: 2px solid var(--gold-mid);
-  border-radius: 16px;
-  padding: 24px;
-  margin-bottom: 30px;
-  box-shadow:
-    0 8px 24px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.4);
   position: relative;
+  margin-bottom: 40px;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(to bottom, #f5f0e6 0%, #e8dfd0 100%);
+  border: 3px solid var(--gold-mid);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
-.turn::before {
-  content: "";
+/* Image container - hero area */
+.turn-image-container {
+  position: relative;
+  background: #0a0805;
+}
+
+/* Header overlay on image */
+.turn-image-header {
   position: absolute;
-  top: -1px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 60%;
-  height: 3px;
-  background: linear-gradient(to right, transparent, var(--gold-light), transparent);
-}
-
-.turn-header {
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid rgba(139, 109, 69, 0.3);
+  padding: 10px 16px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7) 0%, transparent 100%);
 }
 
-.turn-title {
+.turn-image-label {
   font-family: 'Cinzel', serif;
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 700;
-  color: #3e2723;
-  margin: 0;
+  color: var(--gold-light);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
 }
 
-.turn-timestamp {
-  font-size: 0.8rem;
-  color: #7d6a5a;
+.turn-image-style {
+  font-family: 'Lato', sans-serif;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.4);
+  padding: 3px 8px;
+  border-radius: 10px;
 }
 
-.turn-text {
-  color: #3e2723;
-  font-size: 0.8rem;
-  line-height: 1.5;
-  margin-bottom: 12px;
-  max-height: 80px;
-  overflow: hidden;
-}
-
-.turn-text strong {
-  color: #2d1f17;
-  font-weight: 700;
-}
-
+/* Main image - rectangular, full display */
 .turn-image {
   width: 100%;
-  max-width: 700px;
   display: block;
-  margin: 0 auto 12px auto;
-  border-radius: 6px;
-  border: 3px solid var(--gold-mid);
-  box-shadow:
-    /* Inner glow */
-    inset 0 0 15px rgba(0, 0, 0, 0.5),
-    /* Gold highlight (top/left bevel) */
-    inset 2px 2px 0 rgba(243, 229, 171, 0.3),
-    /* Dark edge (bottom/right bevel) */
-    inset -2px -2px 0 rgba(61, 43, 31, 0.5),
-    /* Outer drop shadow */
-    0 4px 12px rgba(0, 0, 0, 0.4),
-    /* Subtle gold glow */
-    0 0 8px rgba(197, 160, 89, 0.2);
   cursor: zoom-in;
 }
 
-.turn-controls {
+/* No image state */
+.turn-no-image {
+  position: relative;
+  background: #1a1008;
+  min-height: 200px;
+}
+
+/* Caption area below image */
+.turn-caption {
+  padding: 16px 20px;
+  background: linear-gradient(to bottom, #f5f0e6 0%, #e8dfd0 100%);
+}
+
+.turn-caption-text {
+  margin: 0;
+  color: #3e2723;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.turn-caption-text strong {
+  color: #2d1f17;
+}
+
+.turn-caption-toggle {
+  background: none;
+  border: none;
+  color: var(--gold-dark);
+  font-size: 0.75rem;
+  cursor: pointer;
+  padding: 4px 0;
+  margin-top: 6px;
+}
+
+.turn-caption-toggle:hover {
+  color: var(--gold-mid);
+  text-decoration: underline;
+}
+
+/* Action buttons */
+.turn-actions {
   display: flex;
   justify-content: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.05);
+  border-top: 1px solid rgba(139, 109, 69, 0.2);
+}
+
+.turn-action-btn {
+  background: linear-gradient(to bottom, #5d4a2a 0%, #3e3018 100%);
+  color: var(--gold-light);
+  border: 1px solid var(--gold-dark);
+  font-family: 'Cinzel', serif;
+  font-size: 0.75rem;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.turn-action-btn:hover:not(:disabled) {
+  background: linear-gradient(to bottom, #6d5a3a 0%, #4e4028 100%);
+}
+
+.turn-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Image zoom modal */
@@ -1449,6 +1490,7 @@ label {
   border-color: rgba(183, 28, 28, 0.3);
   color: #8b2020;
 }
+
 /* Fork Indicator in Card */
 .rpg-card__fork-indicator {
   position: absolute;
@@ -1482,7 +1524,8 @@ label {
 }
 
 .rpg-card__fork-icon {
-  font-size: 1.5rem; /* Fallback for icon size */
+  font-size: 1.5rem;
+  /* Fallback for icon size */
   line-height: 1;
 }
 
@@ -1492,4 +1535,3 @@ label {
     font-size: 1.2rem;
   }
 }
-
