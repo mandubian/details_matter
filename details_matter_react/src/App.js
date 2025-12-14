@@ -20,7 +20,7 @@ function App() {
       const savedThreadId = localStorage.getItem('details_matter_thread_id');
       const savedGalleryRaw = localStorage.getItem('details_matter_gallery');
       const savedForkInfoRaw = localStorage.getItem('details_matter_fork_info');
-      
+
       const computedTurn = savedCurrentTurn
         ? parseInt(savedCurrentTurn, 10)
         : (savedConversation ? savedConversation.length : 0);
@@ -32,7 +32,7 @@ function App() {
         model: savedModel || 'gemini-2.5-flash',
         apiKey: savedApiKey || '',
         isApiKeySet: !!savedApiKey,
-        threadId: savedThreadId || `thread-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`,
+        threadId: savedThreadId || `thread-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
         gallery: savedGalleryRaw ? JSON.parse(savedGalleryRaw) : [],
         forkInfo: savedForkInfoRaw ? JSON.parse(savedForkInfoRaw) : null,
       };
@@ -45,7 +45,7 @@ function App() {
         model: 'gemini-2.5-flash',
         apiKey: '',
         isApiKeySet: false,
-        threadId: `thread-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`,
+        threadId: `thread-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
         gallery: [],
         forkInfo: null,
       };
@@ -53,7 +53,7 @@ function App() {
   };
 
   const initialState = getInitialState();
-  
+
   // State management
   const [apiKey, setApiKey] = useState(initialState.apiKey);
   const [isApiKeySet, setIsApiKeySet] = useState(initialState.isApiKeySet);
@@ -74,9 +74,9 @@ function App() {
   const [view, setView] = useState('gallery');
   const [isMobile, setIsMobile] = useState(() => window.matchMedia?.('(max-width: 768px)')?.matches ?? false);
   const [showSettings, setShowSettings] = useState(false);
-  
+
   const MAX_GALLERY_ITEMS = 20;
-  const AUTO_SNAPSHOT_DEBOUNCE_MS = 1200;
+  const AUTO_SNAPSHOT_DEBOUNCE_MS = 500; // Reduced from 1200ms for faster saves
   const [autoSnapshotEnabled] = useState(true);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [autoSaveError, setAutoSaveError] = useState(null);
@@ -92,7 +92,7 @@ function App() {
         console.error('❌ Failed to initialize Google AI:', error);
       }
     }
-    
+
     if (initialState.conversation.length > 0) {
       console.log('📂 Loaded conversation from localStorage:', initialState.conversation.length, 'turns');
     }
@@ -100,17 +100,17 @@ function App() {
     // Listen for session imports
     const handleImportSession = (event) => {
       const { conversation: newConversation, style: newStyle } = event.detail;
-      
+
       if (newConversation) {
         setConversation(newConversation);
         // Recalculate turn based on conversation length
         setCurrentTurn(newConversation.length);
       }
-      
+
       if (newStyle) {
         setStyle(newStyle);
       }
-      
+
       setSuccess('Session imported successfully!');
       setTimeout(() => setSuccess(null), 3000);
     };
@@ -269,7 +269,7 @@ function App() {
         forkInfo,
         timestamp: new Date().toISOString()
       };
-      
+
       const result = await uploadThread(threadData);
       setSuccess(`Published to Cloud! ID: ${result.id}`);
       setTimeout(() => setSuccess(null), 3000);
@@ -348,9 +348,12 @@ function App() {
       try {
         setIsAutoSaving(true);
         setAutoSaveError(null);
+        console.log(`📸 Auto-saving thread to gallery: ${conversation.length} turns, thread=${threadId}`);
         await saveThreadToLocalGallery({ id: threadId, conv: conversation, s: style, m: model, f: forkInfo, silent: true });
         setLastSnapshotSig(sig);
+        console.log(`✅ Auto-save complete for thread ${threadId}`);
       } catch (err) {
+        console.error(`❌ Auto-save failed:`, err);
         setAutoSaveError(err?.message || String(err));
       } finally {
         setIsAutoSaving(false);
@@ -381,16 +384,16 @@ function App() {
         setModel(data.model || model);
         setThreadId(data.threadId || data.id || `thread-${Date.now()}`);
         setForkInfo(data.forkInfo || null);
-        
+
         setView('editor');
         // setSuccess('Thread loaded successfully.');
       } else if (!isCloud) {
-         // If not found in gallery, check if it matches current threadId (already loaded)
-         if (id === threadId) {
-            if (view !== 'editor') setView('editor');
-            return;
-         }
-         console.warn("Thread not found locally:", id);
+        // If not found in gallery, check if it matches current threadId (already loaded)
+        if (id === threadId) {
+          if (view !== 'editor') setView('editor');
+          return;
+        }
+        console.warn("Thread not found locally:", id);
       }
     } catch (err) {
       console.error('Load failed:', err);
@@ -402,17 +405,17 @@ function App() {
   const resetThread = () => {
     setConversation([]);
     setCurrentTurn(0);
-    const newId = `thread-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`;
+    const newId = `thread-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
     setThreadId(newId);
     setForkInfo(null);
     setInitialImage(null);
-    
+
     // Clear persistence keys
     localStorage.removeItem('details_matter_conversation');
     localStorage.removeItem('details_matter_current_turn');
     localStorage.removeItem('details_matter_thread_id');
     localStorage.removeItem('details_matter_fork_info');
-    
+
     setView('editor');
     return newId;
   };
@@ -420,12 +423,12 @@ function App() {
   useEffect(() => {
     const handleHashChange = async () => {
       const hash = window.location.hash;
-      
+
       if (!hash || hash === '#/' || hash === '#/gallery') {
         if (view !== 'gallery') setView('gallery');
         return;
       }
-      
+
       if (hash === '#/new') {
         const newId = resetThread();
         window.location.replace(`#/thread/${newId}`);
@@ -458,7 +461,7 @@ function App() {
     window.addEventListener('hashchange', handleHashChange);
     // Handle initial load
     handleHashChange();
-    
+
     return () => window.removeEventListener('hashchange', handleHashChange);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gallery, threadId, view]);
@@ -489,14 +492,14 @@ function App() {
         setCurrentTurn(data.conversation.length);
         setStyle(data.style || style);
         setModel(data.model || model);
-        const newThreadId = `thread-${Date.now().toString(36)}-${Math.random().toString(36).slice(2,7)}`;
+        const newThreadId = `thread-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
         setThreadId(newThreadId);
         setForkInfo({ parentId, parentTurn, parentImage });
 
         setView('editor');
         setSuccess('Fork created. You can now continue from this thread.');
         setTimeout(() => setSuccess(null), 3000);
-        
+
         window.location.hash = `#/thread/${newThreadId}`;
       }
     } catch (err) {
@@ -525,7 +528,7 @@ function App() {
     // Before mutating the current thread into a fork, snapshot the full parent into gallery
     // so users don't lose it if they never manually saved.
     saveThreadToLocalGallery({ id: threadId, conv: conversation, s: style, m: model, f: forkInfo, silent: true })
-      .catch(() => {});
+      .catch(() => { });
 
     const newConversation = conversation.slice(0, idx + 1);
     const newThreadId = `thread-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
@@ -538,7 +541,7 @@ function App() {
 
     setSuccess(`Fork created from turn ${idx}. You can now continue from this branch.`);
     setTimeout(() => setSuccess(null), 3000);
-    
+
     window.location.hash = `#/thread/${newThreadId}`;
   };
 
@@ -551,9 +554,9 @@ function App() {
     // Snapshot the current thread first, so we don't lose it
     if (conversation.length > 0) {
       saveThreadToLocalGallery({ id: threadId, conv: conversation, s: style, m: model, f: forkInfo, silent: true })
-        .catch(() => {});
+        .catch(() => { });
     }
-    
+
     window.location.hash = '#/new';
   };
 
