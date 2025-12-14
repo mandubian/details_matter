@@ -192,6 +192,8 @@ function App() {
   useEffect(() => {
     if (forkInfo) {
       localStorage.setItem('details_matter_fork_info', JSON.stringify(forkInfo));
+    } else {
+      localStorage.removeItem('details_matter_fork_info');
     }
   }, [forkInfo]);
 
@@ -578,6 +580,12 @@ function App() {
     );
   }
 
+  const handleDetachFork = () => {
+    setForkInfo(null);
+    setSuccess('Fork info removed. Please save to gallery to make it permanent.');
+    setTimeout(() => setSuccess(null), 3000);
+  };
+
   const sidebarProps = {
     apiKey,
     isApiKeySet,
@@ -597,6 +605,7 @@ function App() {
     onOpenGallery: () => window.location.hash = '#/gallery',
     onPublishCloud: handlePublishCloud,
     onAddToGallery: handleAddToGallery,
+    onDetachFork: forkInfo ? handleDetachFork : null,
     gallery,
     onNewThread: handleNewThread,
   };

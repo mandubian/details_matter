@@ -211,8 +211,8 @@ body {
 
   /* Unified Art Nouveau background with integrated side bands */
   background-image: url('./wall-bg.png');
-  background-size: min(100%, 1400px) auto;
-  /* Cap at 1400px to match card grid */
+  background-size: min(100%, 1900px) auto;
+  /* Cap at 1900px to match card grid */
   background-repeat: repeat-y;
   background-position: top center;
   background-attachment: local;
@@ -226,13 +226,16 @@ body {
 /* === GRID LAYOUT === */
 .rpg-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 40px;
-  max-width: 1300px;
+  width: 100%;
+  max-width: 1700px; /* Matches expanded background minus margins */
   margin: 0 auto;
-  padding: 0 50px;
-  /* Keep cards away from side strips */
+  padding: 0 40px; /* Reduced slightly to fit more content */
+  box-sizing: border-box;
 }
+
+/* Remove the jumpy media query */
 
 .rpg-card {
   background-image: url('./card-frame.png');
@@ -1446,3 +1449,47 @@ label {
   border-color: rgba(183, 28, 28, 0.3);
   color: #8b2020;
 }
+/* Fork Indicator in Card */
+.rpg-card__fork-indicator {
+  position: absolute;
+  top: 6%;
+  right: 6%;
+  width: 18%;
+  aspect-ratio: 1 / 1;
+  border-radius: 50%;
+  border: 2px solid var(--gold-light);
+  background: #1a1008;
+  overflow: hidden;
+  z-index: 20;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s;
+}
+
+.rpg-card__fork-indicator:hover {
+  transform: scale(1.2);
+  border-color: var(--gem-green-light);
+  z-index: 30;
+}
+
+.rpg-card__fork-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.9;
+}
+
+.rpg-card__fork-icon {
+  font-size: 1.5rem; /* Fallback for icon size */
+  line-height: 1;
+}
+
+/* Adjust icon size on smaller cards if needed */
+@container (max-width: 300px) {
+  .rpg-card__fork-icon {
+    font-size: 1.2rem;
+  }
+}
+

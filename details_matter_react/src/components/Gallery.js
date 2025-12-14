@@ -179,9 +179,26 @@ const Gallery = ({
     const title = thread.title || 'Untitled';
     const turnCount = thread.turnCount || (thread.conversation ? thread.conversation.length : '?');
     const parent = thread?.forkInfo?.parentId;
+    const parentImage = thread?.forkInfo?.parentImage;
+    const parentTurn = thread?.forkInfo?.parentTurn;
 
     return (
       <div className="rpg-card" onClick={() => onOpenThread(thread, isCloud)}>
+        {/* Fork Vignette Indicator */}
+        {parent && (
+          <div 
+            className="rpg-card__fork-indicator" 
+            title={`Forked from previous thread${parentTurn !== undefined ? ` at turn ${parentTurn}` : ''}`}
+            onClick={(e) => { e.stopPropagation(); }}
+          >
+            {parentImage ? (
+              <img src={parentImage} alt="fork origin" className="rpg-card__fork-img" />
+            ) : (
+              <span className="rpg-card__fork-icon">🌱</span>
+            )}
+          </div>
+        )}
+
         <div className="rpg-card__frame">
           <div className="rpg-card__imageContainer">
             {images[0] ? (

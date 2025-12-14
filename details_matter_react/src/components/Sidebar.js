@@ -21,9 +21,10 @@ const Sidebar = ({
   onOpenGallery,
   onPublishCloud,
   onNewThread,
-  onAddToGallery,
-  gallery
-}) => {
+    onAddToGallery,
+    onDetachFork,
+    gallery
+  }) => {
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [overrideKeyInput, setOverrideKeyInput] = useState('');
   const [showOverride, setShowOverride] = useState(false);
@@ -32,6 +33,14 @@ const Sidebar = ({
   const [isGeneratingGif, setIsGeneratingGif] = useState(false);
   const [gifProgress, setGifProgress] = useState(0);
   const [isCollapsed, setIsCollapsed] = useState(true); // Collapsed by default
+
+  const handleDetachFork = () => {
+    if (window.confirm('Remove fork information from this thread? This makes it a standalone thread.')) {
+      if (onDetachFork) {
+        onDetachFork();
+      }
+    }
+  };
 
   // Fetch available models when API key changes
   useEffect(() => {
@@ -275,6 +284,17 @@ const Sidebar = ({
                     title="Upload to Cloudflare R2 (Requires Config)"
                   >
                     ☁️ Publish to Cloud
+                  </button>
+                )}
+                
+                {onDetachFork && (
+                  <button 
+                    className="secondary-button" 
+                    onClick={handleDetachFork}
+                    style={{ fontSize: '0.8rem', padding: '8px' }}
+                    title="Fix: Remove incorrect fork association"
+                  >
+                     ✂️ Detach / Unfork
                   </button>
                 )}
               </div>
