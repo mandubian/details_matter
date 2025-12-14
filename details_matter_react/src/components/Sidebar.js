@@ -31,6 +31,7 @@ const Sidebar = ({
   const [loadingModels, setLoadingModels] = useState(false);
   const [isGeneratingGif, setIsGeneratingGif] = useState(false);
   const [gifProgress, setGifProgress] = useState(0);
+  const [isCollapsed, setIsCollapsed] = useState(true); // Collapsed by default
 
   // Fetch available models when API key changes
   useEffect(() => {
@@ -51,7 +52,7 @@ const Sidebar = ({
     loadModels();
     // We intentionally don't include onModelChange/model in deps to avoid loops.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isApiKeySet, apiKey]); 
+  }, [isApiKeySet, apiKey]);
 
   const handleApiKeySubmit = (e) => {
     e.preventDefault();
@@ -86,12 +87,12 @@ const Sidebar = ({
       exportDate: new Date().toISOString(),
       appVersion: "1.0"
     };
-    
+
     // Convert to JSON string
     const jsonString = JSON.stringify(data, null, 2);
     const blob = new Blob([jsonString], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    
+
     // Trigger download
     const link = document.createElement('a');
     link.href = url;
@@ -134,11 +135,11 @@ const Sidebar = ({
     reader.onload = (event) => {
       try {
         const importedData = JSON.parse(event.target.result);
-        
+
         // Dispatch custom event to update parent state (simplest way without prop drilling setConversation)
         const customEvent = new CustomEvent('importSession', { detail: importedData });
         window.dispatchEvent(customEvent);
-        
+
         // Reset file input
         e.target.value = '';
       } catch (err) {
@@ -150,262 +151,274 @@ const Sidebar = ({
   };
 
   return (
-    <div className="sidebar">
-      <h2>⚙️ Settings</h2>
+    <div className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
+      <button
+        className="sidebar-toggle"
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        title={isCollapsed ? 'Expand Settings' : 'Collapse Settings'}
+      >
+        {isCollapsed ? '⚙️' : '◀ Hide'}
+      </button>
 
-      {/* API Key / Auth Section */}
-      <div className="section">
-        <h3>Authentication</h3>
+      {!isCollapsed && <h2>⚙️ Settings</h2>}
 
-        {!isApiKeySet ? (
-          <>
-            <div className="warning" style={{ marginBottom: '12px' }}>
-              <strong>Note:</strong> You need your own Gemini API Key.
-            </div>
+      {!isCollapsed && (
+        <>
+          {/* API Key / Auth Section */}
+          <div className="section">
+            <h3>Authentication</h3>
 
-             <a 
-                href="https://aistudio.google.com/app/apikey" 
-                target="_blank" 
-                rel="noreferrer"
-                className="secondary-button"
-                style={{ width: '100%', marginBottom: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center', textDecoration: 'none', background: 'var(--background-secondary)', boxSizing: 'border-box' }}
-            >
-                🔑 Get API Key (Google AI Studio)
-            </a>
+            {!isApiKeySet ? (
+              <>
+                <div className="warning" style={{ marginBottom: '12px' }}>
+                  <strong>Note:</strong> You need your own Gemini API Key.
+                </div>
 
-            <div style={{ textAlign: 'center', margin: '12px 0', fontSize: '0.8em', color: '#666' }}>THEN</div>
+                <a
+                  href="https://aistudio.google.com/app/apikey"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="secondary-button"
+                  style={{ width: '100%', marginBottom: '12px', display: 'flex', justifyContent: 'center', alignItems: 'center', textDecoration: 'none', background: 'var(--background-secondary)', boxSizing: 'border-box' }}
+                >
+                  🔑 Get API Key (Google AI Studio)
+                </a>
 
-            <form onSubmit={handleApiKeySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: 0 }}>
-              <input
-                type="password"
-                placeholder="Paste Gemini API Key"
-                value={apiKeyInput}
-                onChange={(e) => setApiKeyInput(e.target.value)}
-                required
-                style={{ width: '100%', boxSizing: 'border-box', margin: 0 }}
-              />
-              <button type="submit" className="primary-button" style={{ width: '100%', margin: 0 }}>Set Key</button>
-            </form>
-          </>
-        ) : (
-          <>
-            <div className="success">
-                ✅ API Key Active
-            </div>
+                <div style={{ textAlign: 'center', margin: '12px 0', fontSize: '0.8em', color: '#666' }}>THEN</div>
 
-            {!showOverride ? (
-              <button 
-                onClick={() => setShowOverride(true)} 
-                className="secondary-button" 
-                style={{ width: '100%', justifyContent: 'center' }}
-              >
-                Change API Key
-              </button>
-            ) : (
-              <div style={{ marginTop: '12px' }}>
-                <form onSubmit={handleOverrideSubmit}>
+                <form onSubmit={handleApiKeySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '8px', margin: 0 }}>
                   <input
                     type="password"
-                    placeholder="New API Key"
-                    value={overrideKeyInput}
-                    onChange={(e) => setOverrideKeyInput(e.target.value)}
+                    placeholder="Paste Gemini API Key"
+                    value={apiKeyInput}
+                    onChange={(e) => setApiKeyInput(e.target.value)}
                     required
-                    style={{ marginBottom: '8px' }}
+                    style={{ width: '100%', boxSizing: 'border-box', margin: 0 }}
                   />
-                  <button type="submit" className="primary-button" style={{ width: '100%', marginBottom: '8px' }}>Update Key</button>
+                  <button type="submit" className="primary-button" style={{ width: '100%', margin: 0 }}>Set Key</button>
+                </form>
+              </>
+            ) : (
+              <>
+                <div className="success">
+                  ✅ API Key Active
+                </div>
+
+                {!showOverride ? (
                   <button
-                    type="button"
-                    onClick={() => {
-                      setShowOverride(false);
-                      setOverrideKeyInput('');
-                    }}
+                    onClick={() => setShowOverride(true)}
                     className="secondary-button"
                     style={{ width: '100%', justifyContent: 'center' }}
                   >
-                    Cancel
+                    Change API Key
                   </button>
-                </form>
+                ) : (
+                  <div style={{ marginTop: '12px' }}>
+                    <form onSubmit={handleOverrideSubmit}>
+                      <input
+                        type="password"
+                        placeholder="New API Key"
+                        value={overrideKeyInput}
+                        onChange={(e) => setOverrideKeyInput(e.target.value)}
+                        required
+                        style={{ marginBottom: '8px' }}
+                      />
+                      <button type="submit" className="primary-button" style={{ width: '100%', marginBottom: '8px' }}>Update Key</button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowOverride(false);
+                          setOverrideKeyInput('');
+                        }}
+                        className="secondary-button"
+                        style={{ width: '100%', justifyContent: 'center' }}
+                      >
+                        Cancel
+                      </button>
+                    </form>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Messages */}
+          {error && <div className="error">{error}</div>}
+          {success && <div className="success">{success}</div>}
+
+          {/* Share / Gallery Section */}
+          {isApiKeySet && (
+            <div className="section">
+              <h3>🌐 Share & Gallery</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <button
+                  className="danger-button"
+                  onClick={onNewThread}
+                  disabled={isLoading}
+                >
+                  🧹 New Thread (Reset)
+                </button>
+
+                <button className="primary-button" onClick={onOpenGallery} disabled={isLoading}>
+                  📂 Open Gallery (Local & Cloud)
+                </button>
+
+                <button className="secondary-button" onClick={onAddToGallery} disabled={isLoading}>
+                  💾 Save to Local Gallery
+                </button>
+
+                {conversation.length > 0 && (
+                  <button
+                    className="secondary-button"
+                    onClick={onPublishCloud}
+                    disabled={isLoading}
+                    title="Upload to Cloudflare R2 (Requires Config)"
+                  >
+                    ☁️ Publish to Cloud
+                  </button>
+                )}
               </div>
-            )}
-          </>
-        )}
-      </div>
+            </div>
+          )}
 
-      {/* Messages */}
-      {error && <div className="error">{error}</div>}
-      {success && <div className="success">{success}</div>}
-
-      {/* Share / Gallery Section */}
-      {isApiKeySet && (
-        <div className="section">
-          <h3>🌐 Share & Gallery</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <button
-              className="danger-button"
-              onClick={onNewThread}
-              disabled={isLoading}
-            >
-              🧹 New Thread (Reset)
-            </button>
-            
-            <button className="primary-button" onClick={onOpenGallery} disabled={isLoading}>
-              📂 Open Gallery (Local & Cloud)
-            </button>
-
-            <button className="secondary-button" onClick={onAddToGallery} disabled={isLoading}>
-              💾 Save to Local Gallery
-            </button>
-
-            {conversation.length > 0 && (
-              <button 
-                className="secondary-button" 
-                onClick={onPublishCloud} 
-                disabled={isLoading}
-                title="Upload to Cloudflare R2 (Requires Config)"
+          {/* AI Model Section */}
+          {isApiKeySet && (
+            <div className="section">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3>🧠 AI Model</h3>
+                {loadingModels && <span className="loading" style={{ fontSize: '0.75rem' }}>Fetching...</span>}
+              </div>
+              <select
+                value={model}
+                onChange={(e) => onModelChange(e.target.value)}
+                disabled={loadingModels}
               >
-                ☁️ Publish to Cloud
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+                {availableModels.map(modelOption => (
+                  <option key={modelOption.id} value={modelOption.id}>
+                    {modelOption.name}
+                  </option>
+                ))}
+              </select>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '6px' }}>
+                {availableModels.length > 3 ? 'Models loaded from your key.' : 'Flash is faster/cheaper. Pro is higher quality.'}
+              </div>
+            </div>
+          )}
 
-      {/* AI Model Section */}
-      {isApiKeySet && (
-        <div className="section">
-          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-            <h3>🧠 AI Model</h3>
-            {loadingModels && <span className="loading" style={{fontSize: '0.75rem'}}>Fetching...</span>}
-          </div>
-          <select
-            value={model}
-            onChange={(e) => onModelChange(e.target.value)}
-            disabled={loadingModels}
-          >
-            {availableModels.map(modelOption => (
-              <option key={modelOption.id} value={modelOption.id}>
-                {modelOption.name}
-              </option>
-            ))}
-          </select>
-          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '6px' }}>
-            {availableModels.length > 3 ? 'Models loaded from your key.' : 'Flash is faster/cheaper. Pro is higher quality.'}
-          </div>
-        </div>
-      )}
-
-      {/* Art Style Section */}
-      {isApiKeySet && (
-        <div className="section">
-          <h3>🎨 Style</h3>
-          <select
-            value={style}
-            onChange={(e) => onStyleChange(e.target.value)}
-          >
-            {styles.map(styleOption => (
-              <option key={styleOption} value={styleOption}>
-                {styleOption}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      {/* Storage & Sharing */}
-      {conversation.length > 0 && (
-        <div className="section">
-          <h3>💾 Save / Load</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <button
-              onClick={handleGifExport}
-              className="primary-button"
-              disabled={isGeneratingGif}
-              style={{ background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)', border: 'none' }}
-            >
-              {isGeneratingGif ? `🎬 Generating GIF (${Math.round(gifProgress * 100)}%)...` : '🎬 Export as GIF'}
-            </button>
-
-            <button 
-              onClick={handleExport} 
-              className="primary-button" 
-              style={{ background: 'var(--success-bg)', color: 'var(--success-text)', border: '1px solid var(--success-text)' }}
-            >
-              📥 Export Session (JSON)
-            </button>
-            
-            <div style={{ position: 'relative' }}>
-              <input
-                type="file"
-                accept=".json"
-                onChange={handleImport}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  opacity: 0,
-                  width: '100%',
-                  height: '100%',
-                  cursor: 'pointer'
-                }}
-              />
-              <button 
-                className="primary-button"
-                style={{ width: '100%', pointerEvents: 'none', background: 'var(--background-color)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+          {/* Art Style Section */}
+          {isApiKeySet && (
+            <div className="section">
+              <h3>🎨 Style</h3>
+              <select
+                value={style}
+                onChange={(e) => onStyleChange(e.target.value)}
               >
-                📤 Import Session
-              </button>
+                {styles.map(styleOption => (
+                  <option key={styleOption} value={styleOption}>
+                    {styleOption}
+                  </option>
+                ))}
+              </select>
             </div>
-            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
-              Share the JSON file to let others fork your thread.
-            </p>
-          </div>
-        </div>
-      )}
+          )}
 
-      {/* Stats */}
-      {conversation.length > 0 && (
-        <div className="section">
-          <h3>📊 Stats</h3>
-          <div className="stats">
-            <div className="stat">
-              <div className="stat-value">{currentTurn}</div>
-              <div className="stat-label">Turns</div>
-            </div>
-            <div className="stat">
-              <div className="stat-value">{conversation.length}</div>
-              <div className="stat-label">Total</div>
-            </div>
-          </div>
-        </div>
-      )}
+          {/* Storage & Sharing */}
+          {conversation.length > 0 && (
+            <div className="section">
+              <h3>💾 Save / Load</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <button
+                  onClick={handleGifExport}
+                  className="primary-button"
+                  disabled={isGeneratingGif}
+                  style={{ background: 'linear-gradient(135deg, #a855f7 0%, #ec4899 100%)', border: 'none' }}
+                >
+                  {isGeneratingGif ? `🎬 Generating GIF (${Math.round(gifProgress * 100)}%)...` : '🎬 Export as GIF'}
+                </button>
 
-      {/* Controls */}
-      {conversation.length > 0 && (
-        <div className="section">
-          <h3>Controls</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            <button
-              className="primary-button"
-              style={{ width: '100%', background: 'var(--error-bg)', color: 'var(--error-text)', border: '1px solid var(--error-text)', boxShadow: 'none' }}
-              onClick={onNewThread}
-            >
-              Reset
-            </button>
-            <button
-              className="secondary-button"
-              style={{ width: '100%', justifyContent: 'center' }}
-              onClick={() => {
-                if (conversation.length > 0) {
-                  const event = new CustomEvent('undoLastTurn');
-                  window.dispatchEvent(event);
-                }
-              }}
-              disabled={conversation.length === 0}
-            >
-              Undo
-            </button>
-          </div>
-        </div>
+                <button
+                  onClick={handleExport}
+                  className="primary-button"
+                  style={{ background: 'var(--success-bg)', color: 'var(--success-text)', border: '1px solid var(--success-text)' }}
+                >
+                  📥 Export Session (JSON)
+                </button>
+
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleImport}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      opacity: 0,
+                      width: '100%',
+                      height: '100%',
+                      cursor: 'pointer'
+                    }}
+                  />
+                  <button
+                    className="primary-button"
+                    style={{ width: '100%', pointerEvents: 'none', background: 'var(--background-color)', border: '1px solid var(--border-color)', color: 'var(--text-primary)' }}
+                  >
+                    📤 Import Session
+                  </button>
+                </div>
+                <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                  Share the JSON file to let others fork your thread.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Stats */}
+          {conversation.length > 0 && (
+            <div className="section">
+              <h3>📊 Stats</h3>
+              <div className="stats">
+                <div className="stat">
+                  <div className="stat-value">{currentTurn}</div>
+                  <div className="stat-label">Turns</div>
+                </div>
+                <div className="stat">
+                  <div className="stat-value">{conversation.length}</div>
+                  <div className="stat-label">Total</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Controls */}
+          {conversation.length > 0 && (
+            <div className="section">
+              <h3>Controls</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <button
+                  className="primary-button"
+                  style={{ width: '100%', background: 'var(--error-bg)', color: 'var(--error-text)', border: '1px solid var(--error-text)', boxShadow: 'none' }}
+                  onClick={onNewThread}
+                >
+                  Reset
+                </button>
+                <button
+                  className="secondary-button"
+                  style={{ width: '100%', justifyContent: 'center' }}
+                  onClick={() => {
+                    if (conversation.length > 0) {
+                      const event = new CustomEvent('undoLastTurn');
+                      window.dispatchEvent(event);
+                    }
+                  }}
+                  disabled={conversation.length === 0}
+                >
+                  Undo
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
