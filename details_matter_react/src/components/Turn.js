@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 
 const Turn = ({ turn, index, canRegenerate = false, onRegenerate, onUndo, onFork, isLoading, isApiKeySet }) => {
+  // eslint-disable-next-line no-unused-vars
   const [showRawResponse, setShowRawResponse] = useState(false);
   const [isZoomed, setIsZoomed] = useState(false);
   const [showFullText, setShowFullText] = useState(false);

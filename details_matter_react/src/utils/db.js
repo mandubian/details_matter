@@ -108,6 +108,31 @@ export const getKey = async (key) => {
     });
 };
 
+export const deleteKey = async (key) => {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_KEYVAL], 'readwrite');
+        const store = transaction.objectStore(STORE_KEYVAL);
+        const request = store.delete(key);
+
+        request.onsuccess = () => resolve();
+        request.onerror = (event) => reject(event.target.error);
+    });
+};
+
+// Delete a single thread from the gallery
+export const deleteThread = async (id) => {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction([STORE_GALLERY], 'readwrite');
+        const store = transaction.objectStore(STORE_GALLERY);
+        const request = store.delete(id);
+
+        request.onsuccess = () => resolve();
+        request.onerror = (event) => reject(event.target.error);
+    });
+};
+
 // Migration helper
 export const migrateFromLocalStorage = async () => {
     const localGallery = localStorage.getItem('details_matter_gallery');

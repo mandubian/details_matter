@@ -1,0 +1,16 @@
+name = "details-matter-gallery"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+# KV Namespace for storing thread metadata (titles, timestamps, etc.)
+# Run `wrangler kv:namespace create GALLERY_KV` to get the ID and replace it below.
+[[kv_namespaces]]
+binding = "GALLERY_KV"
+id = "TODO_REPLACE_WITH_KV_ID"
+
+# R2 Bucket for storing the full JSON data of threads (images, prompts)
+# Run `wrangler r2 bucket create details-matter-threads` to create the bucket.
+[[r2_buckets]]
+binding = "GALLERY_BUCKET"
+bucket_name = "details-matter-threads"
+

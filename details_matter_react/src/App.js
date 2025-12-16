@@ -3,26 +3,27 @@ import Sidebar from './components/Sidebar';
 import MainArea from './components/MainArea';
 import Gallery from './components/Gallery';
 import SettingsSheet from './components/SettingsSheet';
-import { initializeGoogleAI, AVAILABLE_MODELS } from './utils/googleAI';
+import { initializeGoogleAI } from './utils/googleAI';
 import { uploadThread, fetchThread } from './services/cloudService';
 import { compressConversation } from './utils/imageUtils';
 
 import {
-  initDB,
   saveGallery,
   loadGallery,
   migrateFromLocalStorage,
   saveKey,
-  getKey
+  getKey,
+  deleteKey,
+  deleteThread
 } from './utils/db'; // Import DB utils
 
 function App() {
   // Initialize state from localStorage immediately to prevent overwriting on first render
-  // Note: Gallery and ForkInfo are now loaded asynchronously from IndexedDB
+  // Note: Gallery, ForkInfo, and Conversation are now loaded asynchronously from IndexedDB
   const getInitialState = () => {
     try {
-      const savedConversationRaw = localStorage.getItem('details_matter_conversation');
-      const savedConversation = savedConversationRaw ? JSON.parse(savedConversationRaw) : [];
+      // We no longer load conversation from localStorage to avoid quota limits
+      const savedConversation = []; 
       const savedCurrentTurn = localStorage.getItem('details_matter_current_turn');
       const savedStyle = localStorage.getItem('details_matter_style');
       const savedModel = localStorage.getItem('details_matter_model');
@@ -31,7 +32,7 @@ function App() {
 
       const computedTurn = savedCurrentTurn
         ? parseInt(savedCurrentTurn, 10)
-        : (savedConversation ? savedConversation.length : 0);
+        : 0;
 
       return {
         conversation: savedConversation,
@@ -89,7 +90,9 @@ function App() {
   const MAX_GALLERY_ITEMS = 50; // Increased limit thanks to IndexedDB
   const AUTO_SNAPSHOT_DEBOUNCE_MS = 500; // Reduced from 1200ms for faster saves
   const [autoSnapshotEnabled] = useState(true);
+  // eslint-disable-next-line no-unused-vars
   const [isAutoSaving, setIsAutoSaving] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [autoSaveError, setAutoSaveError] = useState(null);
   const [lastSnapshotSig, setLastSnapshotSig] = useState('');
 
@@ -120,16 +123,29 @@ function App() {
         setGallery(cleaned);
 
         // Also load forkInfo from IDB keyval store
-        // We used to store it in LS 'details_matter_fork_info'
-        // Migration might have moved it to 'fork_info'
-        const storedForkInfo = await getKey('fork_info');
-        if (storedForkInfo) setForkInfo(storedForkInfo);
+    // We used to store it in LS 'details_matter_fork_info'
+    // Migration might have moved it to 'fork_info'
+    const storedForkInfo = await getKey('fork_info');
+    if (storedForkInfo) setForkInfo(storedForkInfo);
+
+    // Load active conversation from IDB (overrides localStorage if present)
+    try {
+      const storedConversation = await getKey('active_conversation');
+      if (storedConversation && Array.isArray(storedConversation) && storedConversation.length > 0) {
+        console.log('📂 Loaded active conversation from IndexedDB:', storedConversation.length, 'turns');
+        setConversation(storedConversation);
+        // Sync currentTurn to conversation length to ensure consistency
+        setCurrentTurn(storedConversation.length);
+      }
+    } catch (err) {
+      console.error('Failed to load active conversation from IDB:', err);
+    }
       } catch (err) {
         console.error('Failed to load data from DB:', err);
       }
     };
-    loadAsyncData();
-  }, []);
+  loadAsyncData();
+}, []);
 
   // Initialize Google AI if API key was loaded
   useEffect(() => {
@@ -196,16 +212,13 @@ function App() {
   useEffect(() => {
     // Only save non-empty conversations (prevents clearing on initial mount)
     if (conversation.length > 0) {
-      try {
-        const serialized = JSON.stringify(conversation);
-        localStorage.setItem('details_matter_conversation', serialized);
-        console.log('💾 Saved conversation to localStorage:', conversation.length, 'turns');
-      } catch (err) {
-        console.error('❌ Failed to store conversation:', err);
-        if (err.name === 'QuotaExceededError') {
-          console.warn('⚠️ localStorage quota exceeded. Consider using IndexedDB for large conversations.');
-        }
-      }
+      // Save to IndexedDB (unlimited storage)
+      saveKey('active_conversation', conversation)
+        .then(() => console.log('💾 Saved conversation to IndexedDB:', conversation.length, 'turns'))
+        .catch(err => console.error('❌ Failed to store conversation in IDB:', err));
+
+      // Clear legacy localStorage key to avoid confusion/stale data
+      localStorage.removeItem('details_matter_conversation');
     }
   }, [conversation]);
 
@@ -426,13 +439,20 @@ function App() {
     }
   };
 
-  const handleDeleteFromGallery = (id) => {
+  const handleDeleteFromGallery = async (id) => {
     if (!id) return;
     const ok = window.confirm('Delete this thread from local gallery? This cannot be undone.');
     if (!ok) return;
-    setGallery(prev => prev.filter(e => e.id !== id));
-    setSuccess('Deleted from local gallery.');
-    setTimeout(() => setSuccess(null), 2000);
+    
+    try {
+      await deleteThread(id);
+      setGallery(prev => prev.filter(e => e.id !== id));
+      setSuccess('Deleted from local gallery.');
+      setTimeout(() => setSuccess(null), 2000);
+    } catch (err) {
+      console.error('Failed to delete thread:', err);
+      setError('Failed to delete thread from database.');
+    }
   };
 
   // Auto-snapshot current thread into local gallery (compressed)
@@ -511,6 +531,7 @@ function App() {
 
     // Clear persistence keys
     localStorage.removeItem('details_matter_conversation');
+    deleteKey('active_conversation').catch(console.error);
     localStorage.removeItem('details_matter_current_turn');
     localStorage.removeItem('details_matter_thread_id');
     localStorage.removeItem('details_matter_fork_info');

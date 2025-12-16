@@ -14,12 +14,15 @@ const Gallery = ({
 }) => {
   const [activeTab, setActiveTab] = useState('local'); // 'local' or 'cloud'
   const [browseMode, setBrowseMode] = useState('wall'); // 'wall' | 'tree'
+  // eslint-disable-next-line no-unused-vars
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewIndex, setPreviewIndex] = useState(0);
   const [cloudThreads, setCloudThreads] = useState([]);
+  // eslint-disable-next-line no-unused-vars
   const [loadingCloud, setLoadingCloud] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [workerUrlInput, setWorkerUrlInput] = useState(getWorkerUrl() || '');
-  const [isConfiguring, setIsConfiguring] = useState(!getWorkerUrl());
+  const [isConfiguring] = useState(!getWorkerUrl());
   const [treePan, setTreePan] = useState({ x: 0, y: 0 });
   const [treeZoom, setTreeZoom] = useState(1);
   const [genealogyThreadId, setGenealogyThreadId] = useState(null);
@@ -37,9 +40,9 @@ const Gallery = ({
     setLoadingCloud(false);
   };
 
+  // eslint-disable-next-line no-unused-vars
   const handleSaveConfig = () => {
     setWorkerUrl(workerUrlInput);
-    setIsConfiguring(false);
     if (activeTab === 'cloud') loadCloudGallery();
   };
 
@@ -73,6 +76,7 @@ const Gallery = ({
 
   // Full thread images for the preview overlay (so you can browse the evolution).
   // For forks, prefer browsing from the fork point forward.
+  // eslint-disable-next-line no-unused-vars
   const getThreadImagesForPreview = (thread) => {
     if (thread?.conversation && Array.isArray(thread.conversation)) {
       const forkTurn = Number.isFinite(thread?.forkInfo?.parentTurn) ? thread.forkInfo.parentTurn : null;
@@ -91,6 +95,7 @@ const Gallery = ({
   };
 
   // Sample frames across the evolution so a tile gives a sense of progression
+  // eslint-disable-next-line no-unused-vars
   const getEvolutionFrames = (thread, maxFrames = 5) => {
     if (!thread?.conversation || !Array.isArray(thread.conversation)) {
       return thread?.thumbnail ? [thread.thumbnail] : [];
@@ -121,7 +126,7 @@ const Gallery = ({
     return pickedIdx.map(i => images[i]);
   };
 
-  const threads = activeTab === 'local' ? (localGallery || []) : (cloudThreads || []);
+  const threads = useMemo(() => activeTab === 'local' ? (localGallery || []) : (cloudThreads || []), [activeTab, localGallery, cloudThreads]);
 
   const normalizedThreads = useMemo(() => {
     const out = (threads || []).map(t => {
@@ -184,14 +189,17 @@ const Gallery = ({
     return { byId, children, roots };
   }, [normalizedThreads]);
 
+  // eslint-disable-next-line no-unused-vars
   const openPreviewAt = (idx) => {
     const safe = Math.max(0, Math.min(idx, normalizedThreads.length - 1));
     setPreviewIndex(safe);
     setPreviewOpen(true);
   };
 
+  // eslint-disable-next-line no-unused-vars
   const closePreview = () => setPreviewOpen(false);
 
+  // eslint-disable-next-line no-unused-vars
   const stepPreview = (delta) => {
     if (normalizedThreads.length === 0) return;
     const next = (previewIndex + delta + normalizedThreads.length) % normalizedThreads.length;
@@ -282,9 +290,7 @@ const Gallery = ({
                   className="rpg-btn-small rpg-btn-danger"
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (window.confirm(`Delete "${title}"? This cannot be undone.`)) {
-                      onDeleteThread(thread.id);
-                    }
+                    onDeleteThread(thread.id);
                   }}
                 >
                   🗑️
@@ -333,23 +339,9 @@ const Gallery = ({
       <main className="rpg-main">
         {activeTab === 'cloud' && (
           <div className="rpg-notice-panel">
-            {isConfiguring ? (
-              <div className="config-panel">
-                <input
-                  type="text"
-                  placeholder="Worker URL..."
-                  value={workerUrlInput}
-                  onChange={(e) => setWorkerUrlInput(e.target.value)}
-                  className="rpg-input"
-                />
-                <button className="rpg-btn-small" onClick={handleSaveConfig}>Save</button>
+             <div style={{ textAlign: 'center', marginBottom: 10 }}>
+                <button className="rpg-btn-text" onClick={loadCloudGallery}>🔄 Refresh Cloud Gallery</button>
               </div>
-            ) : (
-              <div style={{ textAlign: 'center', marginBottom: 10 }}>
-                <button className="rpg-btn-text" onClick={() => setIsConfiguring(true)}>⚙️ Config</button>
-                <button className="rpg-btn-text" onClick={loadCloudGallery}>🔄 Refresh</button>
-              </div>
-            )}
           </div>
         )}
 
@@ -423,6 +415,7 @@ const Gallery = ({
 
 export default Gallery;
 
+// eslint-disable-next-line no-unused-vars
 const PreviewOverlay = ({ thread, isCloud, getPreviewImages, getThreadImages, onClose, onPrev, onNext, onOpen, onFork }) => {
   const images = (getThreadImages ? getThreadImages(thread) : getPreviewImages(thread)) || [];
   const [activeIdx, setActiveIdx] = useState(0);

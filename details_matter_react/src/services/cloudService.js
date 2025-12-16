@@ -1,14 +1,16 @@
 import { compressConversation } from '../utils/imageUtils';
 
-// Configuration - User will need to set this to their Worker URL
-const WORKER_URL = localStorage.getItem('details_matter_worker_url') || '';
+// Configuration - Hardcoded Worker URL (Service provided by maintainer)
+const DEFAULT_WORKER_URL = 'https://details-matter-gallery.mandubian.workers.dev'; 
+// Allow localStorage override for dev/testing, but default to the official one
+const WORKER_URL = localStorage.getItem('details_matter_worker_url') || DEFAULT_WORKER_URL;
 
 export const setWorkerUrl = (url) => {
   localStorage.setItem('details_matter_worker_url', url);
 };
 
 export const getWorkerUrl = () => {
-  return localStorage.getItem('details_matter_worker_url');
+  return WORKER_URL;
 };
 
 export const uploadThread = async (threadData) => {
