@@ -7,8 +7,18 @@ import { initializeGoogleAI, AVAILABLE_MODELS } from './utils/googleAI';
 import { uploadThread, fetchThread } from './services/cloudService';
 import { compressConversation } from './utils/imageUtils';
 
+import {
+  initDB,
+  saveGallery,
+  loadGallery,
+  migrateFromLocalStorage,
+  saveKey,
+  getKey
+} from './utils/db'; // Import DB utils
+
 function App() {
   // Initialize state from localStorage immediately to prevent overwriting on first render
+  // Note: Gallery and ForkInfo are now loaded asynchronously from IndexedDB
   const getInitialState = () => {
     try {
       const savedConversationRaw = localStorage.getItem('details_matter_conversation');
@@ -18,8 +28,6 @@ function App() {
       const savedModel = localStorage.getItem('details_matter_model');
       const savedApiKey = localStorage.getItem('details_matter_api_key');
       const savedThreadId = localStorage.getItem('details_matter_thread_id');
-      const savedGalleryRaw = localStorage.getItem('details_matter_gallery');
-      const savedForkInfoRaw = localStorage.getItem('details_matter_fork_info');
 
       const computedTurn = savedCurrentTurn
         ? parseInt(savedCurrentTurn, 10)
@@ -33,8 +41,8 @@ function App() {
         apiKey: savedApiKey || '',
         isApiKeySet: !!savedApiKey,
         threadId: savedThreadId || `thread-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
-        gallery: savedGalleryRaw ? JSON.parse(savedGalleryRaw) : [],
-        forkInfo: savedForkInfoRaw ? JSON.parse(savedForkInfoRaw) : null,
+        gallery: null, // Init as null to prevent overwriting DB with empty array before load
+        forkInfo: null, // Loaded async
       };
     } catch (err) {
       console.error('Error loading initial state:', err);
@@ -46,7 +54,7 @@ function App() {
         apiKey: '',
         isApiKeySet: false,
         threadId: `thread-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
-        gallery: [],
+        gallery: null, // Init as null
         forkInfo: null,
       };
     }
@@ -74,13 +82,54 @@ function App() {
   const [view, setView] = useState('gallery');
   const [isMobile, setIsMobile] = useState(() => window.matchMedia?.('(max-width: 768px)')?.matches ?? false);
   const [showSettings, setShowSettings] = useState(false);
+  // Collapsed sidebar state lifted from Sidebar component
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
+  const toggleSidebar = () => setIsSidebarCollapsed(!isSidebarCollapsed);
 
-  const MAX_GALLERY_ITEMS = 20;
+  const MAX_GALLERY_ITEMS = 50; // Increased limit thanks to IndexedDB
   const AUTO_SNAPSHOT_DEBOUNCE_MS = 500; // Reduced from 1200ms for faster saves
   const [autoSnapshotEnabled] = useState(true);
   const [isAutoSaving, setIsAutoSaving] = useState(false);
   const [autoSaveError, setAutoSaveError] = useState(null);
   const [lastSnapshotSig, setLastSnapshotSig] = useState('');
+
+  // Async load gallery and forkInfo from IndexedDB
+  useEffect(() => {
+    const loadAsyncData = async () => {
+      try {
+        await migrateFromLocalStorage(); // One-time migration
+        const storedGallery = await loadGallery();
+
+        // Deduplicate by id (keep first occurrence)
+        const seen = new Set();
+        const deduped = (storedGallery || []).filter(t => {
+          if (!t.id || seen.has(t.id)) return false;
+          seen.add(t.id);
+          return true;
+        });
+
+        // Clean up any self-referential forks (corruption from past bugs)
+        const cleaned = deduped.map(t => {
+          if (t.forkInfo && t.forkInfo.parentId === t.id) {
+            console.warn(`🔧 Cleaning self-referential fork: ${t.id}`);
+            return { ...t, forkInfo: null };
+          }
+          return t;
+        });
+
+        setGallery(cleaned);
+
+        // Also load forkInfo from IDB keyval store
+        // We used to store it in LS 'details_matter_fork_info'
+        // Migration might have moved it to 'fork_info'
+        const storedForkInfo = await getKey('fork_info');
+        if (storedForkInfo) setForkInfo(storedForkInfo);
+      } catch (err) {
+        console.error('Failed to load data from DB:', err);
+      }
+    };
+    loadAsyncData();
+  }, []);
 
   // Initialize Google AI if API key was loaded
   useEffect(() => {
@@ -121,7 +170,7 @@ function App() {
     return () => {
       window.removeEventListener('importSession', handleImportSession);
     };
-  }, []);
+  }, [initialState.apiKey, initialState.conversation]);
 
   // Track mobile breakpoint for editor layout
   useEffect(() => {
@@ -176,24 +225,40 @@ function App() {
     localStorage.setItem('details_matter_thread_id', threadId);
   }, [threadId]);
 
+  // Persist Gallery to IndexedDB (replacing localStorage)
   useEffect(() => {
-    try {
-      localStorage.setItem('details_matter_gallery', JSON.stringify(gallery));
-    } catch (err) {
-      console.error('❌ Failed to store gallery:', err);
-      if (err.name === 'QuotaExceededError' && gallery.length > 1) {
-        // prune and retry
-        const pruned = gallery.slice(0, Math.max(1, Math.floor(gallery.length / 2)));
-        setGallery(pruned);
+    // Only save if gallery has been loaded (not null)
+    if (gallery === null) return;
+
+    // Defensive deduplication before saving to IDB
+    const seen = new Set();
+    const deduped = gallery.filter(t => {
+      if (!t.id || seen.has(t.id)) {
+        if (t.id) console.warn(`⚠️ Duplicate thread detected in gallery: ${t.id}`);
+        return false;
       }
+      seen.add(t.id);
+      return true;
+    });
+
+    // Log if we found duplicates
+    if (deduped.length !== gallery.length) {
+      console.warn(`🔧 Removed ${gallery.length - deduped.length} duplicate(s) from gallery before saving`);
     }
+
+    saveGallery(deduped).catch(err => {
+      console.error('❌ Failed to store gallery in DB:', err);
+      if (err.name === 'QuotaExceededError') {
+        setError("⚠️ Storage limit reached! Please delete some old threads to free up space.");
+        // NO AUTO-DELETION HERE!
+      }
+    });
   }, [gallery]);
 
+  // Persist ForkInfo to IndexedDB
   useEffect(() => {
     if (forkInfo) {
-      localStorage.setItem('details_matter_fork_info', JSON.stringify(forkInfo));
-    } else {
-      localStorage.removeItem('details_matter_fork_info');
+      saveKey('fork_info', forkInfo);
     }
   }, [forkInfo]);
 
@@ -257,7 +322,7 @@ function App() {
     setSuccess(null);
   };
 
-  // Handle Cloud Publishing
+  // Handle Cloud Publishing (current active thread)
   const handlePublishCloud = async () => {
     setIsLoading(true);
     try {
@@ -276,6 +341,30 @@ function App() {
     } catch (err) {
       console.error('Publish failed:', err);
       setError('Failed to publish: ' + err.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Handle uploading a specific gallery thread to cloud
+  const handleUploadGalleryThreadToCloud = async (thread) => {
+    setIsLoading(true);
+    try {
+      const threadData = {
+        threadId: thread.id || thread.threadId,
+        conversation: thread.conversation,
+        style: thread.style,
+        model: thread.model,
+        forkInfo: thread.forkInfo,
+        timestamp: thread.timestamp || new Date().toISOString()
+      };
+
+      const result = await uploadThread(threadData);
+      setSuccess(`Uploaded "${thread.title || 'Thread'}" to Cloud! ID: ${result.id}`);
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      console.error('Upload to cloud failed:', err);
+      setError('Failed to upload: ' + err.message);
     } finally {
       setIsLoading(false);
     }
@@ -300,10 +389,20 @@ function App() {
   const saveThreadToLocalGallery = async ({ id, conv, s, m, f, silent = false }) => {
     // Avoid saving empty
     if (!conv || conv.length === 0) return;
+
+    // Guard: prevent self-referential forks (where forkInfo.parentId === thread id)
+    // This indicates data corruption - clean it up
+    let cleanedForkInfo = f;
+    if (f && f.parentId === id) {
+      console.warn(`⚠️ Detected self-referential fork (id=${id}). Removing corrupt forkInfo.`);
+      cleanedForkInfo = null;
+    }
+
     try {
-      const entry = await buildGalleryEntry({ id, conversation: conv, style: s, model: m, forkInfo: f });
+      const entry = await buildGalleryEntry({ id, conversation: conv, style: s, model: m, forkInfo: cleanedForkInfo });
       setGallery(prev => {
-        const deduped = prev.filter(e => e.id !== id);
+        const current = prev || [];
+        const deduped = current.filter(e => e.id !== id);
         return [entry, ...deduped].slice(0, MAX_GALLERY_ITEMS);
       });
       if (!silent) {
@@ -488,13 +587,35 @@ function App() {
         const parentTurn = Math.max(0, data.conversation.length - 1);
         const parentImage = data.conversation[parentTurn]?.image || null;
 
+        // Content-based lineage: trace back to the true origin of this content
+        // If the parent thread is itself a fork, and the fork point is before the parent's own fork point,
+        // the content actually originated from the parent's origin thread.
+        let originThreadId = parentId;
+        let originTurnIndex = parentTurn;
+
+        if (data.forkInfo) {
+          const parentForkTurn = data.forkInfo.parentTurn || 0;
+          if (parentTurn <= parentForkTurn) {
+            // This turn existed before the parent forked - trace to grandparent
+            originThreadId = data.forkInfo.originThreadId || data.forkInfo.parentId;
+            originTurnIndex = parentTurn; // Same turn index in the origin
+          }
+        }
+
         setConversation(data.conversation);
         setCurrentTurn(data.conversation.length);
         setStyle(data.style || style);
         setModel(data.model || model);
         const newThreadId = `thread-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
         setThreadId(newThreadId);
-        setForkInfo({ parentId, parentTurn, parentImage });
+        setForkInfo({
+          parentId,
+          parentTurn,
+          parentImage,
+          // Content lineage tracking
+          originThreadId,
+          originTurnIndex
+        });
 
         setView('editor');
         setSuccess('Fork created. You can now continue from this thread.');
@@ -525,6 +646,19 @@ function App() {
       }
     }
 
+    // Content-based lineage: trace back to the true origin of this content
+    let originThreadId = parentId;
+    let originTurnIndex = idx;
+
+    if (forkInfo) {
+      const myForkTurn = forkInfo.parentTurn || 0;
+      if (idx <= myForkTurn) {
+        // This turn existed before I forked - trace to my origin
+        originThreadId = forkInfo.originThreadId || forkInfo.parentId;
+        originTurnIndex = idx;
+      }
+    }
+
     // Before mutating the current thread into a fork, snapshot the full parent into gallery
     // so users don't lose it if they never manually saved.
     saveThreadToLocalGallery({ id: threadId, conv: conversation, s: style, m: model, f: forkInfo, silent: true })
@@ -536,7 +670,13 @@ function App() {
     setConversation(newConversation);
     setCurrentTurn(newConversation.length);
     setThreadId(newThreadId);
-    setForkInfo({ parentId, parentTurn: idx, parentImage });
+    setForkInfo({
+      parentId,
+      parentTurn: idx,
+      parentImage,
+      originThreadId,
+      originTurnIndex
+    });
     setView('editor');
 
     setSuccess(`Fork created from turn ${idx}. You can now continue from this branch.`);
@@ -579,6 +719,7 @@ function App() {
         onOpenThread={(t, isCloud) => handleOpenThread(t, isCloud)}
         onForkThread={(t, isCloud) => handleForkThread(t, isCloud)}
         onDeleteThread={(id) => handleDeleteFromGallery(id)}
+        onUploadToCloud={handleUploadGalleryThreadToCloud}
       />
     );
   }
@@ -611,6 +752,8 @@ function App() {
     onDetachFork: forkInfo ? handleDetachFork : null,
     gallery,
     onNewThread: handleNewThread,
+    isCollapsed: isSidebarCollapsed,
+    onToggle: toggleSidebar,
   };
 
   return (
@@ -641,7 +784,7 @@ function App() {
         )}
       </header>
 
-      <div className="main-content">
+      <div className={`main-content ${isSidebarCollapsed && !isMobile ? 'sidebar-collapsed' : ''}`}>
         {!isMobile && <Sidebar {...sidebarProps} />}
 
         <MainArea
@@ -650,6 +793,7 @@ function App() {
           currentTurn={currentTurn}
           setCurrentTurn={setCurrentTurn}
           style={style}
+          onStyleChange={handleStyleChange}
           model={model}
           initialImage={initialImage}
           onInitialImageUpload={handleInitialImageUpload}

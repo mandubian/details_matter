@@ -8,16 +8,13 @@ import { GoogleGenAI } from "@google/genai";
 const API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
 
 export const AVAILABLE_MODELS = [
-  // Fallback list (API may return a different set per key/region).
-  // Keep this small and conservative.
-  { id: "gemini-2.5-flash-image-preview", name: "Gemini 2.5 Flash (Image Preview)" },
-  { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash" },
-  { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro" },
-  { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash" },
+  // Only models that support image generation
+  { id: "gemini-2.5-flash-preview-05-20", name: "Gemini 2.5 Flash (Image Preview)" },
+  { id: "gemini-2.0-flash-preview-image-generation", name: "Gemini 2.0 Flash (Image Gen)" },
 ];
 
 // Default to a model that (when available) supports image output.
-export const DEFAULT_MODEL_ID = "gemini-2.5-flash-image-preview";
+export const DEFAULT_MODEL_ID = "gemini-2.5-flash-preview-05-20";
 
 // Initialize the Google AI client
 let genAI = null;
@@ -68,41 +65,47 @@ export const fetchAvailableModels = async (apiKey) => {
     const res = await fetch(url);
     if (!res.ok) return AVAILABLE_MODELS;
     const data = await res.json();
-    const models = (data.models || [])
+
+    // Parse all models from the API
+    const allModels = (data.models || [])
       .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
       .map(m => {
         const id = (m.name || '').replace('models/', '');
-        return { id, name: m.displayName || id, description: m.description || '' };
+        // Check if model supports image output (look for "image" in name or specific output modalities)
+        const supportsImageOutput =
+          id.toLowerCase().includes('image') ||
+          (m.supportedGenerationMethods || []).includes('generateImage') ||
+          (m.outputTokenLimit && m.outputTokenLimit > 0); // Heuristic for multimodal
+        return {
+          id,
+          name: m.displayName || id,
+          description: m.description || '',
+          supportsImageOutput
+        };
       })
-      // remove obvious non-image/TTS variants
-      .filter(m => !m.id.toLowerCase().includes('tts'));
+      // Remove TTS and embedding models
+      .filter(m => !m.id.toLowerCase().includes('tts') && !m.id.toLowerCase().includes('embedding'));
 
-    // Keep only gemini-ish
-    const filtered = models.filter(m => m.id.toLowerCase().includes('gemini'));
+    // Filter for image-capable models only (gemini models with "image" in their ID)
+    const imageModels = allModels.filter(m =>
+      m.id.toLowerCase().includes('gemini') &&
+      m.id.toLowerCase().includes('image')
+    );
 
-    const priority = [
-      "gemini-2.5-flash-image-preview",
-      "gemini-2.5-flash",
-      "gemini-2.5-pro",
-      "gemini-2.0-flash",
-    ];
-
-    const score = (id) => {
-      const idx = priority.indexOf(id);
-      return idx === -1 ? 999 : idx;
-    };
-
-    const merged = [...filtered];
-    for (const def of AVAILABLE_MODELS) {
-      if (!merged.find(m => m.id === def.id)) merged.push(def);
+    // If we found image-capable models from API, use them; otherwise fall back
+    if (imageModels.length > 0) {
+      // Sort by preference: newer versions first, then alphabetically
+      return imageModels.sort((a, b) => {
+        // Prefer "2.5" over "2.0", etc.
+        const aVersion = a.id.match(/(\d+\.\d+)/)?.[1] || '0';
+        const bVersion = b.id.match(/(\d+\.\d+)/)?.[1] || '0';
+        if (aVersion !== bVersion) return bVersion.localeCompare(aVersion);
+        return a.id.localeCompare(b.id);
+      });
     }
 
-    return merged.sort((a, b) => {
-      const sa = score(a.id);
-      const sb = score(b.id);
-      if (sa !== sb) return sa - sb;
-      return a.id.localeCompare(b.id);
-    });
+    // Fallback to hardcoded list if no image models found
+    return AVAILABLE_MODELS;
   } catch (e) {
     console.error('Error fetching models:', e);
     return AVAILABLE_MODELS;
@@ -110,73 +113,73 @@ export const fetchAvailableModels = async (apiKey) => {
 };
 
 const prepareContents = async (prompt, context, previousImage, style) => {
-    let fullPrompt = context ? `${context}\n\n${prompt}` : prompt;
-    if (style) {
-      fullPrompt += `\nStyle: ${style}.`;
-    }
+  let fullPrompt = context ? `${context}\n\n${prompt}` : prompt;
+  if (style) {
+    fullPrompt += `\nStyle: ${style}.`;
+  }
 
-    let contents;
+  let contents;
 
-    if (previousImage) {
-      try {
-        // Convert blob URL or data URL to base64 for the API
-        let imageData, mimeType;
+  if (previousImage) {
+    try {
+      // Convert blob URL or data URL to base64 for the API
+      let imageData, mimeType;
 
-        if (previousImage.startsWith('data:')) {
-          // Handle data URL
-          const [mime, data] = previousImage.split(',');
-          mimeType = mime.split(':')[1].split(';')[0];
-          imageData = data;
-        } else if (previousImage.startsWith('blob:')) {
-          // Handle blob URL - we need to fetch and convert
-          const response = await fetch(previousImage);
-          const blob = await response.blob();
-          mimeType = blob.type;
+      if (previousImage.startsWith('data:')) {
+        // Handle data URL
+        const [mime, data] = previousImage.split(',');
+        mimeType = mime.split(':')[1].split(';')[0];
+        imageData = data;
+      } else if (previousImage.startsWith('blob:')) {
+        // Handle blob URL - we need to fetch and convert
+        const response = await fetch(previousImage);
+        const blob = await response.blob();
+        mimeType = blob.type;
 
-          // Convert blob to base64
-          const reader = new FileReader();
-          imageData = await new Promise((resolve) => {
-            reader.onload = () => resolve(reader.result.split(',')[1]);
-            reader.readAsDataURL(blob);
-          });
-        } else {
-          throw new Error('Unsupported image format');
-        }
-
-        contents = [
-          {
-            role: 'user',
-            parts: [
-              { text: fullPrompt },
-              {
-                inlineData: {
-                  mimeType: mimeType,
-                  data: imageData
-                }
-              }
-            ]
-          }
-        ];
-      } catch (error) {
-        console.error('Error processing previous image:', error);
-        // Fall back to text-only if image processing fails
-        contents = [{ role: 'user', parts: [{ text: fullPrompt }] }];
+        // Convert blob to base64
+        const reader = new FileReader();
+        imageData = await new Promise((resolve) => {
+          reader.onload = () => resolve(reader.result.split(',')[1]);
+          reader.readAsDataURL(blob);
+        });
+      } else {
+        throw new Error('Unsupported image format');
       }
-    } else {
+
+      contents = [
+        {
+          role: 'user',
+          parts: [
+            { text: fullPrompt },
+            {
+              inlineData: {
+                mimeType: mimeType,
+                data: imageData
+              }
+            }
+          ]
+        }
+      ];
+    } catch (error) {
+      console.error('Error processing previous image:', error);
+      // Fall back to text-only if image processing fails
       contents = [{ role: 'user', parts: [{ text: fullPrompt }] }];
     }
-    return contents;
+  } else {
+    contents = [{ role: 'user', parts: [{ text: fullPrompt }] }];
+  }
+  return contents;
 };
 
 const performGenerateCall = async (model, contents) => {
-    if (genAI) {
-        return await genAI.models.generateContent({
-            model,
-            contents,
-        });
-    } else {
-        throw new Error("No API Key available");
-    }
+  if (genAI) {
+    return await genAI.models.generateContent({
+      model,
+      contents,
+    });
+  } else {
+    throw new Error("No API Key available");
+  }
 };
 
 export const generateContent = async (prompt, context = "", previousImage = null, style = "", model = DEFAULT_MODEL_ID) => {
@@ -193,7 +196,7 @@ export const generateContent = async (prompt, context = "", previousImage = null
 
   try {
     generationInProgress = true;
-    
+
     const contents = await prepareContents(prompt, context, previousImage, style);
 
     console.log('Contents:', contents);
@@ -214,7 +217,7 @@ export const generateContent = async (prompt, context = "", previousImage = null
       }
     }
 
-    console.log(`📦 Outgoing request size ≈ ${(requestBytes/1024).toFixed(1)} KB` + (imageDecodedBytes > 0 ? ` | images (decoded) ≈ ${(imageDecodedBytes/1024).toFixed(1)} KB` : ''));
+    console.log(`📦 Outgoing request size ≈ ${(requestBytes / 1024).toFixed(1)} KB` + (imageDecodedBytes > 0 ? ` | images (decoded) ≈ ${(imageDecodedBytes / 1024).toFixed(1)} KB` : ''));
 
     // Generate content
     const response = await performGenerateCall(model, contents);
@@ -226,10 +229,10 @@ export const generateContent = async (prompt, context = "", previousImage = null
 
     let text = response?.text || null; // SDK helper
     if (!text && candidates.length > 0) {
-        // Manual extraction if SDK helper not present (e.g. raw fetch response)
-        text = parts.map(p => p.text || '').join('');
+      // Manual extraction if SDK helper not present (e.g. raw fetch response)
+      text = parts.map(p => p.text || '').join('');
     }
-    
+
     let image = null;
 
     for (const part of parts) {
@@ -263,7 +266,7 @@ export const generateContent = async (prompt, context = "", previousImage = null
       }
     }
 
-  return { text, image, metrics: { requestBytes, imageDecodedBytes } };
+    return { text, image, metrics: { requestBytes, imageDecodedBytes } };
 
   } catch (error) {
     console.error('Error generating content:', error);
@@ -309,14 +312,18 @@ export const generateContent = async (prompt, context = "", previousImage = null
       console.debug('Could not parse detailed Google error info:', parseErr);
     }
 
+    const retryHint = ' (Provider issues are often temporary — try again in a moment.)';
+
     if (error.message && error.message.includes('API_KEY_INVALID')) {
       throw new Error('Invalid API key. Please check your Gemini API key.');
     } else if (error.message && error.message.includes('QUOTA_EXCEEDED')) {
       throw new Error('API quota exceeded. Please check your usage limits.');
     } else if (error.message && error.message.includes('PERMISSION_DENIED')) {
-      throw new Error('Permission denied. Please check your API key permissions.');
+      throw new Error('Permission denied. Please check your API key permissions.' + retryHint);
+    } else if (error.message && (error.message.includes('503') || error.message.includes('500') || error.message.includes('overloaded'))) {
+      throw new Error('API server is temporarily unavailable.' + retryHint);
     } else {
-      throw new Error(`Generation failed: ${error.message || 'Unknown error'}`);
+      throw new Error(`Generation failed: ${error.message || 'Unknown error'}` + retryHint);
     }
   } finally {
     generationInProgress = false;

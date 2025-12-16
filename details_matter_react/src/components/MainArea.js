@@ -21,33 +21,36 @@ const MainArea = ({
   onClearMessages,
   forkInfo,
   threadId,
-  onForkFromTurn
+  onForkFromTurn,
+  onStyleChange
 }) => {
   const [initialPrompt, setInitialPrompt] = useState('');
   const [uploadedFile, setUploadedFile] = useState(null);
   const inFlightRef = useRef(false); // UI-level single-flight guard
 
   // Handle undo last turn
-  useEffect(() => {
-    const handleUndo = () => {
-      if (conversation.length > 0) {
-        const lastTurn = conversation[conversation.length - 1];
+  const handleUndoTurn = () => {
+    if (conversation.length > 0) {
+      const lastTurn = conversation[conversation.length - 1];
 
-        // Clean up blob URLs to prevent memory leaks (images are usually data: URLs now)
-        if (lastTurn.image && typeof lastTurn.image === 'string' && lastTurn.image.startsWith('blob:')) {
-          URL.revokeObjectURL(lastTurn.image);
-        }
-
-        setConversation(prev => prev.slice(0, -1));
-        setCurrentTurn(prev => Math.max(0, prev - 1));
-        setSuccess('Last turn undone successfully!');
-        setTimeout(() => setSuccess(null), 3000);
+      // Clean up blob URLs to prevent memory leaks (images are usually data: URLs now)
+      if (lastTurn.image && typeof lastTurn.image === 'string' && lastTurn.image.startsWith('blob:')) {
+        URL.revokeObjectURL(lastTurn.image);
       }
-    };
 
-    window.addEventListener('undoLastTurn', handleUndo);
-    return () => window.removeEventListener('undoLastTurn', handleUndo);
-  }, [conversation, setConversation, setCurrentTurn, setSuccess]);
+      setConversation(prev => prev.slice(0, -1));
+      setCurrentTurn(prev => Math.max(0, prev - 1));
+      setSuccess('Last turn undone successfully!');
+      setTimeout(() => setSuccess(null), 3000);
+    }
+  };
+
+  useEffect(() => {
+    window.addEventListener('undoLastTurn', handleUndoTurn);
+    return () => window.removeEventListener('undoLastTurn', handleUndoTurn);
+  }); // Updated on every render to capture closure state
+
+  // Handle initial image upload
 
   // Handle initial image upload
   const handleFileUpload = (file) => {
@@ -68,8 +71,8 @@ const MainArea = ({
       return;
     }
 
-  setIsLoading(true);
-  inFlightRef.current = true;
+    setIsLoading(true);
+    inFlightRef.current = true;
     setError(null);
     onClearMessages();
 
@@ -103,7 +106,7 @@ const MainArea = ({
   };
 
   // Handle continuing the evolution
-  const handleContinueEvolution = async () => {
+  const handleContinueEvolution = async (guidance = '') => {
     if (inFlightRef.current || isLoading) return; // prevent concurrent continue
     if (!isApiKeySet) {
       setError('Please set your API key first');
@@ -116,7 +119,8 @@ const MainArea = ({
     onClearMessages();
 
     try {
-      await generateNextTurn(conversation, currentTurn, '', null);
+      // Pass guidance to influence the next generation
+      await generateNextTurn(conversation, currentTurn, guidance, null);
       setSuccess(`Turn ${currentTurn + 1} generated successfully!`);
       setTimeout(() => setSuccess(null), 3000);
     } catch (error) {
@@ -151,7 +155,14 @@ const MainArea = ({
       }
     } else {
       // Subsequent turns: evolve from previous image
-      autoPrompt = "Based on the previous image, select one important detail for you independently of the rest of the image (e.g., a specific object, character, or element). Describe your choice in text and then create a new story, situation, anecdote or other idea in which that detail is preserved as a detail, not necessarily the main subject of the image. Then, generate a new image from your description, while keeping only this detail recognizable.";
+      const basePrompt = "Based on the previous image, select one important detail for you independently of the rest of the image (e.g., a specific object, character, or element). Describe your choice in text and then create a new story, situation, anecdote or other idea in which that detail is preserved as a detail, not necessarily the main subject of the image. Then, generate a new image from your description, while keeping only this detail recognizable.";
+
+      // Incorporate user guidance if provided
+      if (initialPromptText && initialPromptText.trim()) {
+        autoPrompt = `${basePrompt}\n\nUser direction: ${initialPromptText.trim()}`;
+      } else {
+        autoPrompt = basePrompt;
+      }
 
       // Find the most recent image
       for (let i = currentConversation.length - 1; i >= 0; i--) {
@@ -166,7 +177,7 @@ const MainArea = ({
 
     const result = await generateContent(autoPrompt, '', previousImage, style, model);
     if (result?.metrics) {
-      const kb = (n) => (n/1024).toFixed(1);
+      const kb = (n) => (n / 1024).toFixed(1);
       console.log(`📊 Generation metrics: request ≈ ${kb(result.metrics.requestBytes)} KB` + (result.metrics.imageDecodedBytes ? ` | images (decoded) ≈ ${kb(result.metrics.imageDecodedBytes)} KB` : ''));
     }
 
@@ -217,7 +228,7 @@ const MainArea = ({
 
       const result = await generateContent(prompt, '', previousImage, style, model);
       if (result?.metrics) {
-        const kb = (n) => (n/1024).toFixed(1);
+        const kb = (n) => (n / 1024).toFixed(1);
         console.log(`📊 Regeneration metrics: request ≈ ${kb(result.metrics.requestBytes)} KB` + (result.metrics.imageDecodedBytes ? ` | images (decoded) ≈ ${kb(result.metrics.imageDecodedBytes)} KB` : ''));
       }
 
@@ -305,11 +316,14 @@ const MainArea = ({
           conversation={conversation}
           onContinue={handleContinueEvolution}
           onRegenerateTurn={handleRegenerateTurn}
+          onUndoTurn={handleUndoTurn}
           onForkFromTurn={onForkFromTurn}
           currentTurn={currentTurn}
           style={style}
+          onStyleChange={onStyleChange}
           isLoading={isLoading}
           isApiKeySet={isApiKeySet}
+          forkTurn={forkInfo?.parentTurn}
         />
       )}
     </div>

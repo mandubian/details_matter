@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { fetchCloudGallery, getWorkerUrl, setWorkerUrl } from '../services/cloudService';
+import GenealogyTree from './GenealogyTree';
 
 const Gallery = ({
   localGallery,
@@ -9,6 +10,7 @@ const Gallery = ({
   onOpenThread,
   onForkThread,
   onDeleteThread,
+  onUploadToCloud,
 }) => {
   const [activeTab, setActiveTab] = useState('local'); // 'local' or 'cloud'
   const [browseMode, setBrowseMode] = useState('wall'); // 'wall' | 'tree'
@@ -20,6 +22,7 @@ const Gallery = ({
   const [isConfiguring, setIsConfiguring] = useState(!getWorkerUrl());
   const [treePan, setTreePan] = useState({ x: 0, y: 0 });
   const [treeZoom, setTreeZoom] = useState(1);
+  const [genealogyThreadId, setGenealogyThreadId] = useState(null);
 
   useEffect(() => {
     if (activeTab === 'cloud' && !isConfiguring && getWorkerUrl()) {
@@ -41,19 +44,28 @@ const Gallery = ({
   };
 
   const getPreviewImages = (thread) => {
-    // Local threads may have the compressed conversation stored; cloud threads typically have only thumbnail.
+    // Get preview images for thread cards
+    // For forks: show first image AFTER the fork point (what makes this branch unique)
+    // Fallback: fork-point image, then first available image
     if (thread?.conversation && Array.isArray(thread.conversation)) {
       const forkTurn = Number.isFinite(thread?.forkInfo?.parentTurn) ? thread.forkInfo.parentTurn : null;
       const images = thread.conversation
         .map((t, idx) => ({ idx, img: t?.image }))
         .filter(x => !!x.img);
 
-      // If it's a fork, prefer images after the fork point so it doesn't look like a duplicate.
       if (forkTurn !== null) {
+        // It's a fork - prioritize images after the fork point
         const postFork = images.filter(x => x.idx > forkTurn).map(x => x.img);
-        if (postFork.length > 0) return postFork.slice(0, 4);
+        if (postFork.length > 0) {
+          return postFork.slice(0, 4);
+        }
+        // No new images yet - use the fork-point image as preview
+        if (thread.forkInfo.parentImage) {
+          return [thread.forkInfo.parentImage];
+        }
       }
 
+      // Root thread or fallback - show from beginning
       return images.map(x => x.img).slice(0, 4);
     }
     return thread?.thumbnail ? [thread.thumbnail] : [];
@@ -112,11 +124,25 @@ const Gallery = ({
   const threads = activeTab === 'local' ? (localGallery || []) : (cloudThreads || []);
 
   const normalizedThreads = useMemo(() => {
-    const out = (threads || []).map(t => ({
-      ...t,
-      id: t.id || t.threadId,
-      forkInfo: t.forkInfo || t.forkFrom || null,
-    })).filter(t => !!t.id);
+    const out = (threads || []).map(t => {
+      // Normalize forkInfo from various possible structures
+      let forkInfo = t.forkInfo || t.forkFrom || null;
+
+      // Handle legacy structures where parentId might be named differently
+      if (forkInfo && !forkInfo.parentId) {
+        // Try alternative field names
+        forkInfo = {
+          ...forkInfo,
+          parentId: forkInfo.parentId || forkInfo.parentThreadId || forkInfo.parent || forkInfo.sourceId || null
+        };
+      }
+
+      return {
+        ...t,
+        id: t.id || t.threadId,
+        forkInfo,
+      };
+    }).filter(t => !!t.id);
     return out;
   }, [threads]);
 
@@ -179,20 +205,30 @@ const Gallery = ({
     const title = thread.title || 'Untitled';
     const turnCount = thread.turnCount || (thread.conversation ? thread.conversation.length : '?');
     const parent = thread?.forkInfo?.parentId;
-    const parentImage = thread?.forkInfo?.parentImage;
     const parentTurn = thread?.forkInfo?.parentTurn;
+
+    // Get the very first image in the conversation (the origin) for the vignette
+    // This is different from getPreviewImages which shows post-fork images for forks
+    const originImage = (() => {
+      if (thread?.conversation && Array.isArray(thread.conversation)) {
+        const firstWithImage = thread.conversation.find(t => t?.image);
+        if (firstWithImage?.image) return firstWithImage.image;
+      }
+      // Fallback to parentImage if no images in conversation
+      return thread?.forkInfo?.parentImage || null;
+    })();
 
     return (
       <div className="rpg-card" onClick={() => onOpenThread(thread, isCloud)}>
-        {/* Fork Vignette Indicator */}
+        {/* Fork Vignette Indicator - shows the ORIGIN (first image) */}
         {parent && (
-          <div 
-            className="rpg-card__fork-indicator" 
+          <div
+            className="rpg-card__fork-indicator"
             title={`Forked from previous thread${parentTurn !== undefined ? ` at turn ${parentTurn}` : ''}`}
             onClick={(e) => { e.stopPropagation(); }}
           >
-            {parentImage ? (
-              <img src={parentImage} alt="fork origin" className="rpg-card__fork-img" />
+            {originImage ? (
+              <img src={originImage} alt="fork origin" className="rpg-card__fork-img" />
             ) : (
               <span className="rpg-card__fork-icon">🌱</span>
             )}
@@ -207,8 +243,10 @@ const Gallery = ({
               <div className="rpg-card__empty">No Preview</div>
             )}
 
-            {/* Medallion / Jewel overlay */}
-            <div className={`rpg-card__jewel ${images[0] ? 'has-image' : ''}`}></div>
+            {/* Medallion / Jewel overlay with Turn Count */}
+            <div className={`rpg-card__jewel ${images[0] ? 'has-image' : ''}`}>
+              {turnCount}
+            </div>
           </div>
 
           <div className="rpg-card__content">
@@ -217,16 +255,41 @@ const Gallery = ({
             <div className="rpg-card__actions">
               <button
                 className="rpg-btn-small"
-                onClick={(e) => { e.stopPropagation(); openPreviewAt(normalizedThreads.indexOf(thread)); }}
-              >
-                🔍 Preview
-              </button>
-              <button
-                className="rpg-btn-small"
                 onClick={(e) => { e.stopPropagation(); onForkThread(thread, isCloud); }}
               >
                 🌱 Fork
               </button>
+              <button
+                className="rpg-btn-small"
+                onClick={(e) => { e.stopPropagation(); setGenealogyThreadId(thread.id); }}
+              >
+                🌳 Lineage
+              </button>
+              {!isCloud && onUploadToCloud && (
+                <button
+                  className="rpg-btn-small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onUploadToCloud(thread);
+                  }}
+                  title="Upload to Cloud"
+                >
+                  ☁️ Upload
+                </button>
+              )}
+              {!isCloud && onDeleteThread && (
+                <button
+                  className="rpg-btn-small rpg-btn-danger"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (window.confirm(`Delete "${title}"? This cannot be undone.`)) {
+                      onDeleteThread(thread.id);
+                    }
+                  }}
+                >
+                  🗑️
+                </button>
+              )}
             </div>
           </div>
 
@@ -290,7 +353,7 @@ const Gallery = ({
           </div>
         )}
 
-        {browseMode === 'wall' && (
+        {browseMode === 'wall' && !genealogyThreadId && (
           <div className="rpg-grid">
             {normalizedThreads.map(t => (
               <RPGThreadCard key={t.id} thread={t} isCloud={activeTab === 'cloud'} />
@@ -301,7 +364,7 @@ const Gallery = ({
           </div>
         )}
 
-        {browseMode === 'tree' && (
+        {browseMode === 'tree' && !genealogyThreadId && (
           <div className="rpg-tree-container">
             {tree.roots.length === 0 ? <div className="rpg-empty">Empty Archive</div> :
               <TreeMap
@@ -318,6 +381,18 @@ const Gallery = ({
               />
             }
           </div>
+        )}
+
+        {/* Genealogy Tree View (single thread lineage) */}
+        {genealogyThreadId && (
+          <GenealogyTree
+            selectedThreadId={genealogyThreadId}
+            tree={tree}
+            getPreviewImages={getPreviewImages}
+            onSelectThread={setGenealogyThreadId}
+            onOpenThread={(t) => onOpenThread(t, activeTab === 'cloud')}
+            onBack={() => setGenealogyThreadId(null)}
+          />
         )}
       </main>
 
@@ -342,20 +417,6 @@ const Gallery = ({
         </button>
       </nav>
 
-      {/* Fullscreen preview (swipeable) */}
-      {previewOpen && normalizedThreads[previewIndex] && (
-        <PreviewOverlay
-          thread={normalizedThreads[previewIndex]}
-          isCloud={activeTab === 'cloud'}
-          getPreviewImages={getPreviewImages}
-          getThreadImages={getThreadImagesForPreview}
-          onClose={closePreview}
-          onPrev={() => stepPreview(-1)}
-          onNext={() => stepPreview(1)}
-          onOpen={() => onOpenThread(normalizedThreads[previewIndex], activeTab === 'cloud')}
-          onFork={() => onForkThread(normalizedThreads[previewIndex], activeTab === 'cloud')}
-        />
-      )}
     </div>
   );
 };

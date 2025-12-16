@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { STYLES } from '../constants/styles';
 import { AVAILABLE_MODELS, fetchAvailableModels } from '../utils/googleAI';
 import { generateGif } from '../utils/gifGenerator';
 
@@ -21,10 +22,12 @@ const Sidebar = ({
   onOpenGallery,
   onPublishCloud,
   onNewThread,
-    onAddToGallery,
-    onDetachFork,
-    gallery
-  }) => {
+  onAddToGallery,
+  onDetachFork,
+  gallery,
+  isCollapsed,
+  onToggle
+}) => {
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [overrideKeyInput, setOverrideKeyInput] = useState('');
   const [showOverride, setShowOverride] = useState(false);
@@ -32,7 +35,6 @@ const Sidebar = ({
   const [loadingModels, setLoadingModels] = useState(false);
   const [isGeneratingGif, setIsGeneratingGif] = useState(false);
   const [gifProgress, setGifProgress] = useState(0);
-  const [isCollapsed, setIsCollapsed] = useState(true); // Collapsed by default
 
   const handleDetachFork = () => {
     if (window.confirm('Remove fork information from this thread? This makes it a standalone thread.')) {
@@ -80,13 +82,6 @@ const Sidebar = ({
     setShowOverride(false);
     onClearMessages();
   };
-
-  const styles = [
-    'Photorealistic', 'Cartoon', 'Abstract', 'Fantasy', 'Sci-Fi', 'Surreal',
-    'Anime', 'Watercolor', 'Oil Painting', 'Digital Art', 'Minimalist',
-    'Vintage', 'Cyberpunk', 'Steampunk', 'Impressionist', 'Gothic', 'Noir',
-    'Pop Art', 'Cubist', 'Art Nouveau'
-  ];
 
   // Export functionality
   const handleExport = () => {
@@ -163,7 +158,7 @@ const Sidebar = ({
     <div className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
       <button
         className="sidebar-toggle"
-        onClick={() => setIsCollapsed(!isCollapsed)}
+        onClick={onToggle}
         title={isCollapsed ? 'Expand Settings' : 'Collapse Settings'}
       >
         {isCollapsed ? '⚙️' : '◀ Hide'}
@@ -286,15 +281,15 @@ const Sidebar = ({
                     ☁️ Publish to Cloud
                   </button>
                 )}
-                
+
                 {onDetachFork && (
-                  <button 
-                    className="secondary-button" 
+                  <button
+                    className="secondary-button"
                     onClick={handleDetachFork}
                     style={{ fontSize: '0.8rem', padding: '8px' }}
                     title="Fix: Remove incorrect fork association"
                   >
-                     ✂️ Detach / Unfork
+                    ✂️ Detach / Unfork
                   </button>
                 )}
               </div>
@@ -333,7 +328,7 @@ const Sidebar = ({
                 value={style}
                 onChange={(e) => onStyleChange(e.target.value)}
               >
-                {styles.map(styleOption => (
+                {STYLES.map(styleOption => (
                   <option key={styleOption} value={styleOption}>
                     {styleOption}
                   </option>

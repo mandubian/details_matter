@@ -374,23 +374,47 @@ body {
   overflow: hidden;
 }
 
+.rpg-card__turn-count {
+  font-size: 0.65rem;
+  color: #5d4037;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+  margin-top: 2px;
+}
+
 .rpg-card__jewel {
   position: absolute;
-  bottom: -14px;
+  bottom: 8px;
+  /* Positioned inside the frame, just above bottom edge */
   left: 50%;
   transform: translateX(-50%);
-  width: 24px;
-  height: 24px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
-  background: #4a3a2a;
-  border: 2px solid var(--gold-light);
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.6);
-  z-index: 10;
+  border: 2px solid #fff8e7;
+  background: radial-gradient(circle at 35% 35%, #e6c17b, #8a6e3e);
+  color: #3e2723;
+  font-family: 'Cinzel', serif;
+  font-size: 0.8rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 20;
+  box-shadow:
+    0 4px 6px rgba(0, 0, 0, 0.5),
+    inset 0 2px 5px rgba(255, 255, 255, 0.6),
+    inset 0 -2px 5px rgba(0, 0, 0, 0.2);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .rpg-card__jewel.has-image {
-  background: radial-gradient(circle at 30% 30%, #d4c4a0, #8a7a5a);
-  box-shadow: 0 0 8px rgba(197, 160, 89, 0.4);
+  /* Richer golden amber for active cards */
+  background: radial-gradient(circle at 35% 35%, #ffd700, #b8860b);
+  border-color: #fff;
+  box-shadow:
+    0 0 10px rgba(255, 215, 0, 0.4),
+    0 4px 6px rgba(0, 0, 0, 0.6),
+    inset 0 2px 4px rgba(255, 255, 255, 0.8);
 }
 
 .rpg-card__actions {
@@ -440,6 +464,19 @@ body {
 .rpg-btn-small:active {
   transform: translateY(0);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+.rpg-btn-small.rpg-btn-danger {
+  background: linear-gradient(to bottom, #6d2020 0%, #4a1515 100%);
+  border-color: #8b3030;
+}
+
+.rpg-btn-small.rpg-btn-danger:hover {
+  background: linear-gradient(to bottom, #8b3030 0%, #6d2020 100%);
+  border-color: #a04040;
+  box-shadow:
+    0 4px 8px rgba(0, 0, 0, 0.5),
+    0 0 10px rgba(180, 60, 60, 0.3);
 }
 
 /* === NAV BAR === */
@@ -958,12 +995,19 @@ label {
 }
 
 .spinner {
+  display: inline-block;
   width: 18px;
   height: 18px;
   border: 2px solid currentColor;
   border-top-color: transparent;
   border-radius: 50%;
   animation: spin 1s linear infinite;
+}
+
+.spinner.small {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
 }
 
 @keyframes spin {
@@ -1259,31 +1303,43 @@ label {
   padding-bottom: 140px;
 }
 
-/* Turn card - Art Nouveau frame */
+/* Turn card - Realistic 3D trading card */
 .turn {
   position: relative;
   margin-bottom: 50px;
-  border-radius: 16px;
+  border-radius: 12px;
   overflow: hidden;
-  background: linear-gradient(to bottom, #f5f0e6 0%, #e8dfd0 100%);
+
+  /* Layered card stock effect */
+  background:
+    /* Subtle paper texture noise */
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E"),
+    /* Parchment gradient */
+    linear-gradient(175deg, #f8f4ec 0%, #f0eadc 30%, #e8dfd0 70%, #ddd4c4 100%);
+
+  /* Multi-layer border for card edge thickness */
   border: 3px solid var(--gold-mid);
-  /* Deep multi-layered shadow for "lying on table" effect */
   box-shadow:
-    /* Soft close shadow */
-    0 4px 8px rgba(0, 0, 0, 0.3),
-    /* Medium spread shadow */
-    0 12px 24px rgba(0, 0, 0, 0.35),
-    /* Deep far shadow */
-    0 24px 48px rgba(0, 0, 0, 0.25),
-    /* Very deep ambient shadow */
-    0 40px 80px rgba(0, 0, 0, 0.15),
-    /* Top bevel highlight */
-    inset 0 2px 0 rgba(255, 255, 255, 0.5),
-    /* Bottom edge shadow */
-    inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+    /* Card edge - dark bottom/right */
+    3px 3px 0 #8b6d45,
+    /* Card edge - light top/left */
+    -1px -1px 0 #c5a059,
+    /* Inner edge highlight */
+    inset 0 0 0 1px rgba(197, 160, 89, 0.4),
+    /* Inner top bevel */
+    inset 0 2px 4px rgba(255, 255, 255, 0.6),
+    /* Inner bottom shadow */
+    inset 0 -2px 4px rgba(0, 0, 0, 0.08),
+    /* Close shadow */
+    0 6px 12px rgba(0, 0, 0, 0.25),
+    /* Medium shadow */
+    0 16px 32px rgba(0, 0, 0, 0.2),
+    /* Far shadow */
+    0 32px 64px rgba(0, 0, 0, 0.12);
 }
 
-/* Delicate Art Nouveau inner border on the card */
+/* Art Nouveau decorations disabled for testing */
+/*
 .turn::before {
   content: "";
   position: absolute;
@@ -1294,7 +1350,6 @@ label {
   z-index: 20;
 }
 
-/* Subtle corner flourishes on the card */
 .turn::after {
   content: "";
   position: absolute;
@@ -1302,20 +1357,21 @@ label {
   pointer-events: none;
   z-index: 21;
   background:
-    /* Top-left corner arc */
     radial-gradient(12px 12px at 12px 12px, transparent 48%, rgba(197, 160, 89, 0.35) 50%, transparent 54%),
-    /* Top-right corner arc */
     radial-gradient(12px 12px at calc(100% - 12px) 12px, transparent 48%, rgba(197, 160, 89, 0.35) 50%, transparent 54%),
-    /* Bottom-left corner arc */
     radial-gradient(12px 12px at 12px calc(100% - 12px), transparent 48%, rgba(197, 160, 89, 0.35) 50%, transparent 54%),
-    /* Bottom-right corner arc */
     radial-gradient(12px 12px at calc(100% - 12px) calc(100% - 12px), transparent 48%, rgba(197, 160, 89, 0.35) 50%, transparent 54%);
 }
+*/
 
 /* Image container - hero area */
 .turn-image-container {
   position: relative;
   background: #0a0805;
+  /* Match the footer's border for symmetry */
+  border-bottom: 3px solid var(--gold-mid);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  z-index: 5;
 }
 
 /* Header overlay on image */
@@ -1361,6 +1417,8 @@ label {
   position: relative;
   background: #1a1008;
   min-height: 200px;
+  padding-top: 50px;
+  /* Room for the absolute-positioned header */
 }
 
 /* Caption area below image */
@@ -1395,14 +1453,61 @@ label {
   text-decoration: underline;
 }
 
-/* Action buttons */
+/* Action buttons - Art Nouveau footer */
 .turn-actions {
+  position: relative;
   display: flex;
   justify-content: center;
-  gap: 8px;
-  padding: 12px 16px;
-  background: rgba(0, 0, 0, 0.05);
-  border-top: 1px solid rgba(139, 109, 69, 0.2);
+  gap: 12px;
+  padding: 20px 20px 24px 20px;
+  background:
+    /* Art Nouveau leaf pattern at top */
+    radial-gradient(ellipse 60px 20px at 50% 0%, rgba(197, 160, 89, 0.15) 0%, transparent 100%),
+    /* Gradient base */
+    linear-gradient(to bottom, #e8dfd0 0%, #d8cfc0 100%);
+  /* Decorative double border */
+  border-top: 3px solid var(--gold-mid);
+  box-shadow:
+    inset 0 6px 12px -6px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+/* Art Nouveau center ornament */
+.turn-actions::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #d4c4a0, #8a7a5a 60%, #5d4a2a);
+  border: 2px solid var(--gold-light);
+  box-shadow:
+    0 3px 8px rgba(0, 0, 0, 0.5),
+    inset 0 1px 2px rgba(255, 255, 255, 0.3);
+  z-index: 25;
+}
+
+/* Decorative side flourishes */
+.turn-actions::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  height: 3px;
+  background:
+    /* Gold line with fade */
+    linear-gradient(to right,
+      transparent 0%,
+      rgba(197, 160, 89, 0.5) 20%,
+      transparent 40%,
+      transparent 60%,
+      rgba(197, 160, 89, 0.5) 80%,
+      transparent 100%);
 }
 
 .turn-action-btn {
@@ -1451,27 +1556,141 @@ label {
 }
 
 /* === FLOATING ACTION BAR === */
-.floating-action-bar {
+/* === FLOATING ACTION BAR === */
+/* Container spans the content area to handle positioning */
+.floating-action-bar-container {
   position: fixed;
   bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: calc(100% - 370px);
-  /* Account for sidebar */
-  max-width: 800px;
-  background: linear-gradient(to top, #2b1d12 0%, rgba(43, 29, 18, 0.95) 100%);
-  border-top: 2px solid var(--gold-dark);
-  border-top-left-radius: 16px;
-  border-top-right-radius: 16px;
-  padding: 16px 24px;
+  /* Default: Sidebar open (320px) */
+  left: 320px;
+  right: 0;
+  height: 0;
+  /* Don't block clicks above bar */
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  /* Pin to bottom */
+  z-index: 100;
+  pointer-events: none;
+  /* Pass clicks through empty areas */
+  transition: left 0.3s ease;
+  /* Smooth sync with sidebar */
+  padding-bottom: 24px;
+  /* Space from bottom edge */
+}
+
+/* Inner bar has the visual style and content */
+/* Inner bar has the visual style and content */
+.floating-action-bar {
+  /* Reset positioning props as they are handled by container now */
+  position: relative;
+  left: auto;
+  bottom: auto;
+  transform: none;
+  margin: 0;
+
+  width: min(90%, 800px);
+  /* Responsive max width */
+  pointer-events: auto;
+  /* Re-enable interaction */
+
+  /* New "Cooler" Visuals */
+  background:
+    /* Subtle noise */
+    url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E"),
+    linear-gradient(to bottom, #2b1d12 0%, #1a1008 100%);
+
+  /* Full gold border */
+  border: 3px solid var(--gold-mid);
+  border-radius: 50px;
+  /* Capsule shape */
+
+  padding: 10px 20px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  z-index: 100;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5);
-  margin-left: 160px;
-  /* Half of sidebar width to center properly */
+
+  /* Deep floating shadow */
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.6),
+    0 4px 10px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.floating-action-bar__controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.floating-action-bar__turn-info {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+.floating-action-bar__style-selector select {
+  appearance: none;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--gold-dark);
+  color: var(--gold-light);
+  padding: 6px 24px 6px 12px;
+  border-radius: 20px;
+  font-family: 'Cinzel', serif;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  /* Custom arrow */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='8' viewBox='0 0 24 24' fill='none' stroke='%23c5a059' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+}
+
+.floating-action-bar__style-selector select:hover {
+  border-color: var(--gold-mid);
+  background-color: rgba(0, 0, 0, 0.6);
+}
+
+.floating-action-bar__style-selector select:focus {
+  outline: none;
+  border-color: var(--gold-light);
+  box-shadow: 0 0 0 2px rgba(197, 160, 89, 0.2);
+}
+
+/* Adjust wrapper when sidebar is collapsed (50px) */
+.sidebar-collapsed .floating-action-bar-container {
+  left: 50px;
+}
+
+@media (max-width: 900px) {
+  .floating-action-bar-container {
+    left: 0;
+    /* Sidebar likely hidden/overlay or non-displacing */
+    padding-bottom: 0;
+    /* Flush with bottom on smaller screens */
+  }
+
+  .floating-action-bar {
+    width: 94%;
+    padding: 12px 16px;
+    border-radius: 16px 16px 0 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .floating-action-bar-container {
+    left: 0;
+  }
+
+  .floating-action-bar {
+    width: 100%;
+    border-radius: 0;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+  }
 }
 
 .floating-action-bar__input {
@@ -1573,5 +1792,449 @@ label {
 @container (max-width: 300px) {
   .rpg-card__fork-icon {
     font-size: 1.2rem;
+  }
+}
+
+/* === GENEALOGY TREE VIEW === */
+.genealogy-tree {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px;
+  min-height: 100%;
+  /* Avoid expensive SVG turbulence (can crash tabs on some GPUs) */
+  background:
+    radial-gradient(1200px 700px at 50% 0%, rgba(197, 160, 89, 0.08), transparent 60%),
+    repeating-linear-gradient(135deg,
+      rgba(255, 255, 255, 0.015) 0px,
+      rgba(255, 255, 255, 0.015) 2px,
+      transparent 2px,
+      transparent 10px),
+    linear-gradient(to bottom, #1a1008 0%, #0d0805 100%);
+  overflow-y: auto;
+}
+
+.genealogy-tree--empty {
+  justify-content: center;
+  color: var(--text-muted);
+}
+
+.genealogy-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 32px;
+  width: 100%;
+  max-width: 600px;
+}
+
+.genealogy-back-btn {
+  align-self: flex-start;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--gold-dark);
+  color: var(--gold-light);
+  padding: 8px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+  font-family: 'Cinzel', serif;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.genealogy-back-btn:hover {
+  background: rgba(197, 160, 89, 0.2);
+  border-color: var(--gold-mid);
+}
+
+.genealogy-title {
+  font-family: 'Cinzel', serif;
+  font-size: 1.4rem;
+  color: var(--gold-light);
+  margin: 0;
+  text-align: center;
+}
+
+/* Sections */
+.genealogy-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 800px;
+}
+
+.genealogy-section__label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.genealogy-section--ancestors {
+  margin-bottom: 8px;
+}
+
+.genealogy-section--selected {
+  margin: 16px 0;
+}
+
+.genealogy-section--siblings {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px dashed var(--gold-dark);
+}
+
+.genealogy-section--children {
+  margin-top: 8px;
+}
+
+.genealogy-section--empty .genealogy-empty-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Chain (vertical stack of ancestors) */
+.genealogy-chain {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Row (horizontal for siblings/children) */
+.genealogy-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+}
+
+/* Connector lines */
+.genealogy-connector {
+  color: var(--gold-dark);
+  font-size: 1.5rem;
+  line-height: 1;
+  user-select: none;
+  display: none;
+  /* Hide old text connectors */
+}
+
+.genealogy-line-vertical {
+  width: 2px;
+  background-color: var(--gold-dark);
+  height: 24px;
+  flex-shrink: 0;
+  margin: 0 auto;
+}
+
+.genealogy-connector--vertical {
+  margin: 4px 0;
+}
+
+/* Node Cards */
+.genealogy-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: linear-gradient(145deg, #2b1d12 0%, #1a1008 100%);
+  border: 2px solid var(--gold-dark);
+  border-radius: 12px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  width: 140px;
+}
+
+.genealogy-node:hover:not(.genealogy-node--selected) {
+  border-color: var(--gold-mid);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+}
+
+.genealogy-node--ancestor {
+  width: 120px;
+  opacity: 0.85;
+  border-color: rgba(197, 160, 89, 0.4);
+}
+
+.genealogy-node--selected {
+  width: 200px;
+  border: 3px solid var(--gold-light);
+  background: linear-gradient(145deg, #3d2b1f 0%, #2b1d12 100%);
+  box-shadow:
+    0 0 20px rgba(197, 160, 89, 0.3),
+    0 12px 30px rgba(0, 0, 0, 0.5);
+  cursor: default;
+}
+
+.genealogy-node--sibling {
+  width: 120px;
+  opacity: 0.75;
+  border-style: dashed;
+}
+
+.genealogy-node--child {
+  width: 130px;
+}
+
+.genealogy-node__image {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0d0805;
+  margin-bottom: 8px;
+}
+
+.genealogy-node__image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.genealogy-node__placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  color: var(--text-muted);
+}
+
+.genealogy-node__info {
+  text-align: center;
+  width: 100%;
+}
+
+.genealogy-node__title {
+  font-family: 'Cinzel', serif;
+  font-size: 0.85rem;
+  color: var(--gold-light);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 4px;
+}
+
+.genealogy-node--selected .genealogy-node__title {
+  font-size: 1rem;
+}
+
+.genealogy-node__meta {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.genealogy-node__open-btn {
+  margin-top: 12px;
+  padding: 8px 20px;
+  background: linear-gradient(to bottom, var(--gold-mid), var(--gold-dark));
+  border: none;
+  border-radius: 20px;
+  color: #1a1008;
+  font-family: 'Cinzel', serif;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.genealogy-node__open-btn:hover {
+  background: linear-gradient(to bottom, var(--gold-light), var(--gold-mid));
+  transform: scale(1.05);
+}
+
+/* Mobile adjustments */
+@media (max-width: 600px) {
+  .genealogy-tree {
+    padding: 16px;
+  }
+
+  .genealogy-node {
+    width: 100px;
+  }
+
+  .genealogy-node--selected {
+    width: 160px;
+  }
+
+  .genealogy-node--ancestor,
+  .genealogy-node--sibling,
+  .genealogy-node--child {
+    width: 90px;
+  }
+
+  .genealogy-node__title {
+    font-size: 0.75rem;
+  }
+
+  .genealogy-title {
+    font-size: 1.1rem;
+  }
+}
+
+/* === NEW LAYOUT STYLES === */
+
+/* Origin badge */
+.genealogy-origin-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  margin-bottom: 24px;
+  background: rgba(197, 160, 89, 0.1);
+  border: 1px solid var(--gold-dark);
+  border-radius: 8px;
+  max-width: 500px;
+}
+
+.genealogy-origin-badge__icon {
+  font-size: 1.2rem;
+}
+
+.genealogy-origin-badge__text {
+  flex: 1;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.genealogy-origin-badge__text strong {
+  color: var(--gold-light);
+}
+
+.genealogy-origin-badge__link {
+  background: transparent;
+  border: 1px solid var(--gold-dark);
+  color: var(--gold-light);
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.genealogy-origin-badge__link:hover {
+  background: rgba(197, 160, 89, 0.2);
+  border-color: var(--gold-mid);
+}
+
+/* === SIMPLE VERTICAL GENEALOGY TREE === */
+
+.genealogy-main {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: 40px;
+}
+
+.genealogy-parent-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Vertical connector line */
+.genealogy-connector-v {
+  width: 2px;
+  height: 24px;
+  background: var(--gold-dark);
+  flex-shrink: 0;
+}
+
+/* Horizontal bar connecting siblings */
+.genealogy-h-bar {
+  width: 300px;
+  max-width: 80%;
+  height: 2px;
+  background: var(--gold-dark);
+  margin: 0 auto;
+}
+
+/* Siblings Row */
+.genealogy-siblings-row {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 16px;
+  padding: 0 20px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--gold-dark) transparent;
+  justify-content: center;
+}
+
+.genealogy-siblings-row::-webkit-scrollbar {
+  height: 6px;
+}
+
+.genealogy-siblings-row::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.genealogy-siblings-row::-webkit-scrollbar-thumb {
+  background: var(--gold-dark);
+  border-radius: 3px;
+}
+
+.genealogy-sibling-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.genealogy-sibling-item--selected {
+  order: -1;
+  /* Selected first */
+}
+
+/* Children Section */
+.genealogy-children-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.genealogy-children-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.genealogy-child-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Empty state label */
+.genealogy-empty-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 8px 16px;
+  border: 1px dashed var(--gold-dark);
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+/* Mobile adjustments */
+@media (max-width: 600px) {
+  .genealogy-siblings-row {
+    padding: 0 10px;
+    gap: 10px;
+  }
+
+  .genealogy-h-bar {
+    width: 200px;
   }
 }
