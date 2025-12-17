@@ -6,11 +6,12 @@ compatibility_date = "2024-01-01"
 # Run `wrangler kv:namespace create GALLERY_KV` to get the ID and replace it below.
 [[kv_namespaces]]
 binding = "GALLERY_KV"
-id = "TODO_REPLACE_WITH_KV_ID"
+id = "38c1b1f6fdf5416885796ce7c549d1f8"
 
 # R2 Bucket for storing the full JSON data of threads (images, prompts)
 # Run `wrangler r2 bucket create details-matter-threads` to create the bucket.
 [[r2_buckets]]
 binding = "GALLERY_BUCKET"
-bucket_name = "details-matter-threads"
+bucket_name = "details-matter-v1"
+
 

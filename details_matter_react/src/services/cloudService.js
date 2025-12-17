@@ -1,7 +1,7 @@
 import { compressConversation } from '../utils/imageUtils';
 
 // Configuration - Hardcoded Worker URL (Service provided by maintainer)
-const DEFAULT_WORKER_URL = 'https://details-matter-gallery.mandubian.workers.dev'; 
+const DEFAULT_WORKER_URL = 'https://details-matter-gallery.pascal-voitot.workers.dev'; 
 // Allow localStorage override for dev/testing, but default to the official one
 const WORKER_URL = localStorage.getItem('details_matter_worker_url') || DEFAULT_WORKER_URL;
 
