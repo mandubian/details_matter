@@ -2124,20 +2124,55 @@ label {
 
 /* === SIMPLE VERTICAL GENEALOGY TREE === */
 
+/* Animation for elegant lineage transitions */
+@keyframes genealogy-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .genealogy-main {
   display: flex;
   flex-direction: column;
   align-items: center;
   padding-bottom: 40px;
+  position: relative;
+  animation: genealogy-fade-in 0.35s ease-out;
+}
+
+/* SVG overlay for drawing connector lines */
+.genealogy-svg-connectors {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  overflow: visible;
 }
 
 .genealogy-parent-section {
   display: flex;
   flex-direction: column;
   align-items: center;
+  position: relative;
+  z-index: 1;
 }
 
-/* Vertical connector line */
+/* Spacer to give room for SVG lines */
+.genealogy-connector-spacer {
+  height: 36px;
+  flex-shrink: 0;
+}
+
+/* Vertical connector line (for ancestors chain only) */
 .genealogy-connector-v {
   width: 2px;
   height: 24px;
@@ -2145,20 +2180,16 @@ label {
   flex-shrink: 0;
 }
 
-/* Horizontal bar connecting siblings */
+/* Horizontal bar connecting siblings - hidden, SVG draws this now */
 .genealogy-h-bar {
-  width: 300px;
-  max-width: 80%;
-  height: 2px;
-  background: var(--gold-dark);
-  margin: 0 auto;
+  display: none;
 }
 
 /* Siblings Row */
 .genealogy-siblings-row {
   display: flex;
   flex-wrap: nowrap;
-  gap: 16px;
+  gap: 24px;
   padding: 0 20px;
   overflow-x: auto;
   overflow-y: hidden;
@@ -2166,6 +2197,9 @@ label {
   scrollbar-width: thin;
   scrollbar-color: var(--gold-dark) transparent;
   justify-content: center;
+  position: relative;
+  z-index: 1;
+  touch-action: pan-x;
 }
 
 .genealogy-siblings-row::-webkit-scrollbar {
@@ -2200,6 +2234,8 @@ label {
   flex-direction: column;
   align-items: center;
   margin-top: 8px;
+  position: relative;
+  z-index: 1;
 }
 
 .genealogy-children-row {

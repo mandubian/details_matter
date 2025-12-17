@@ -23,7 +23,7 @@ function App() {
   const getInitialState = () => {
     try {
       // We no longer load conversation from localStorage to avoid quota limits
-      const savedConversation = []; 
+      const savedConversation = [];
       const savedCurrentTurn = localStorage.getItem('details_matter_current_turn');
       const savedStyle = localStorage.getItem('details_matter_style');
       const savedModel = localStorage.getItem('details_matter_model');
@@ -123,29 +123,29 @@ function App() {
         setGallery(cleaned);
 
         // Also load forkInfo from IDB keyval store
-    // We used to store it in LS 'details_matter_fork_info'
-    // Migration might have moved it to 'fork_info'
-    const storedForkInfo = await getKey('fork_info');
-    if (storedForkInfo) setForkInfo(storedForkInfo);
+        // We used to store it in LS 'details_matter_fork_info'
+        // Migration might have moved it to 'fork_info'
+        const storedForkInfo = await getKey('fork_info');
+        if (storedForkInfo) setForkInfo(storedForkInfo);
 
-    // Load active conversation from IDB (overrides localStorage if present)
-    try {
-      const storedConversation = await getKey('active_conversation');
-      if (storedConversation && Array.isArray(storedConversation) && storedConversation.length > 0) {
-        console.log('📂 Loaded active conversation from IndexedDB:', storedConversation.length, 'turns');
-        setConversation(storedConversation);
-        // Sync currentTurn to conversation length to ensure consistency
-        setCurrentTurn(storedConversation.length);
-      }
-    } catch (err) {
-      console.error('Failed to load active conversation from IDB:', err);
-    }
+        // Load active conversation from IDB (overrides localStorage if present)
+        try {
+          const storedConversation = await getKey('active_conversation');
+          if (storedConversation && Array.isArray(storedConversation) && storedConversation.length > 0) {
+            console.log('📂 Loaded active conversation from IndexedDB:', storedConversation.length, 'turns');
+            setConversation(storedConversation);
+            // Sync currentTurn to conversation length to ensure consistency
+            setCurrentTurn(storedConversation.length);
+          }
+        } catch (err) {
+          console.error('Failed to load active conversation from IDB:', err);
+        }
       } catch (err) {
         console.error('Failed to load data from DB:', err);
       }
     };
-  loadAsyncData();
-}, []);
+    loadAsyncData();
+  }, []);
 
   // Initialize Google AI if API key was loaded
   useEffect(() => {
@@ -383,16 +383,24 @@ function App() {
     }
   };
 
-  const buildGalleryEntry = async ({ id, conversation: conv, style: s, model: m, forkInfo: f }) => {
+  const buildGalleryEntry = async ({ id, conversation: conv, style: s, model: m, forkInfo: f, existingEntry = null }) => {
     const compressedConv = await compressConversation(conv);
     const title = conv?.[0]?.text?.slice(0, 80) || 'Untitled Thread';
+
+    // Only update timestamp if content actually changed (new turns added)
+    const existingConvLength = existingEntry?.conversation?.length || 0;
+    const contentChanged = compressedConv.length !== existingConvLength;
+    const timestamp = contentChanged
+      ? new Date().toISOString()
+      : (existingEntry?.timestamp || new Date().toISOString());
+
     return {
       id,
       title,
       conversation: compressedConv,
       style: s,
       model: m,
-      timestamp: new Date().toISOString(),
+      timestamp,
       forkInfo: f || null,
       threadId: id,
       thumbnail: compressedConv.find(t => t.image)?.image || null
@@ -412,10 +420,27 @@ function App() {
     }
 
     try {
-      const entry = await buildGalleryEntry({ id, conversation: conv, style: s, model: m, forkInfo: cleanedForkInfo });
+      // Find existing entry to preserve timestamp if content unchanged
+      const existingEntry = (gallery || []).find(e => e.id === id);
+
+      // Skip save if content hasn't changed (same conversation length)
+      if (silent && existingEntry && existingEntry.conversation?.length === conv.length) {
+        console.log(`⏭️ Skipping auto-save for ${id} - no content change`);
+        return;
+      }
+
+      const entry = await buildGalleryEntry({ id, conversation: conv, style: s, model: m, forkInfo: cleanedForkInfo, existingEntry });
       setGallery(prev => {
         const current = prev || [];
         const deduped = current.filter(e => e.id !== id);
+        // Keep entries in place if just updating, only move to front if new
+        if (existingEntry) {
+          // Find original position and insert there
+          const originalIndex = current.findIndex(e => e.id === id);
+          const result = [...deduped];
+          result.splice(originalIndex >= 0 ? originalIndex : 0, 0, entry);
+          return result.slice(0, MAX_GALLERY_ITEMS);
+        }
         return [entry, ...deduped].slice(0, MAX_GALLERY_ITEMS);
       });
       if (!silent) {
@@ -443,7 +468,7 @@ function App() {
     if (!id) return;
     const ok = window.confirm('Delete this thread from local gallery? This cannot be undone.');
     if (!ok) return;
-    
+
     try {
       await deleteThread(id);
       setGallery(prev => prev.filter(e => e.id !== id));
