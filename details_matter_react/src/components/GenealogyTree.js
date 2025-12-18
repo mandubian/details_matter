@@ -27,6 +27,17 @@ function computeLineage(threadId, byId, childrenMap) {
         if (parent) {
             ancestors.unshift(parent);
             current = parent;
+        } else if (current.forkInfo?.isParentCloud) {
+            // Found a cloud parent not in local store - create a virtual node
+            const cloudParent = {
+                id: parentId,
+                title: current.forkInfo.parentTitle || 'Cloud Thread',
+                thumbnail: current.forkInfo.parentImage,
+                turnCount: (current.forkInfo.parentTurn || 0) + 1,
+                isRemote: true
+            };
+            ancestors.unshift(cloudParent);
+            break; // Currently we don't have enough info to go higher than one cloud parent if not locally present
         } else {
             break;
         }
@@ -212,7 +223,7 @@ const TreeConnectors = ({ containerRef, parentRef, siblingRefs, childRefs, hasPa
         }
 
         setLines(newLines);
-    }, [containerRef, parentRef, siblingRefs, childRefs, hasParent, hasSiblings, hasChildren]);
+    }, [containerRef, parentRef, siblingRefs, childRefs, hasParent, hasChildren]);
 
     useLayoutEffect(() => {
         calculateLines();
@@ -368,6 +379,27 @@ const GenealogyTree = ({
                 className={`genealogy-node genealogy-node--${variant} ${isSelected ? 'genealogy-node--selected' : ''}`}
                 onClick={handleClick}
             >
+                {/* Heritage Ribbon - art nouveau ribbon style */}
+                <div style={{
+                    position: 'absolute',
+                    top: '4px',
+                    left: '0px',
+                    background: (thread.isRemote || thread.forkInfo?.isParentCloud)
+                        ? 'linear-gradient(to right, #f2e1c9, #e8d0ae)'
+                        : 'linear-gradient(to right, #e8ede3, #d4dbcd)',
+                    padding: '1px 5px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    fontSize: '7px',
+                    fontWeight: 800,
+                    fontFamily: "'Cinzel', serif",
+                    color: (thread.isRemote || thread.forkInfo?.isParentCloud) ? '#3d2b1f' : '#3d4a35',
+                    border: `1px solid ${(thread.isRemote || thread.forkInfo?.isParentCloud) ? '#a67c52' : '#8b9a7d'}`,
+                    zIndex: 5,
+                    clipPath: 'polygon(0% 0%, 100% 0%, 90% 50%, 100% 100%, 0% 100%, 10% 50%)'
+                }}>
+                    {(thread.isRemote || thread.forkInfo?.isParentCloud) ? 'Published' : 'Local'}
+                </div>
                 <div className="genealogy-node__image">
                     {images[0] ? (
                         <img src={images[0]} alt={title} />

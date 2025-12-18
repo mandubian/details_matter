@@ -20,13 +20,18 @@ const ConversationDisplay = ({
   const forkPointRef = useRef(null);
   const hasScrolledRef = useRef(false);
 
-  // Auto-scroll to fork point when conversation loads (only once)
+  // Auto-scroll to fork point or first new turn when conversation loads (only once)
   useEffect(() => {
     if (forkTurn !== null && forkTurn !== undefined && !hasScrolledRef.current && conversation.length > 0) {
       // Wait for DOM to render
       const timer = setTimeout(() => {
-        if (forkPointRef.current) {
-          forkPointRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Preferred scroll target: the first turn AFTER the fork point (what makes this fork unique)
+        // If no new turns yet, scroll to the fork point itself.
+        const scrollTargetIdx = Math.min(forkTurn + 1, conversation.length - 1);
+        const scrollTarget = document.getElementById(`turn-${scrollTargetIdx}`) || forkPointRef.current;
+
+        if (scrollTarget) {
+          scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
           hasScrolledRef.current = true;
         }
       }, 300);
@@ -47,19 +52,34 @@ const ConversationDisplay = ({
           const canRegenerate = isLast && turn?.model_name !== 'Human Input';
           const isForkPoint = forkTurn !== null && forkTurn !== undefined && index === forkTurn;
 
+          const isForkStart = forkTurn !== null && forkTurn !== undefined && index === forkTurn + 1;
+
           const turnElement = (
-            <Turn
-              key={turn.id || index}
-              turn={turn}
-              index={index}
-              canRegenerate={canRegenerate}
-              onRegenerate={canRegenerate ? () => onRegenerateTurn(index) : null}
-              onUndo={onUndoTurn ? () => onUndoTurn(index) : null}
-              onFork={onForkFromTurn ? () => onForkFromTurn(index) : null}
-              isLoading={isLoading}
-              isApiKeySet={isApiKeySet}
-              isForkPoint={isForkPoint}
-            />
+            <React.Fragment key={turn.id || index}>
+              {isForkStart && (
+                <div className="fork-divider">
+                  <div className="fork-divider__line"></div>
+                  <div className="fork-divider__label">
+                    <span className="fork-divider__icon">🌱</span>
+                    <span>Fork Started Here</span>
+                  </div>
+                  <div className="fork-divider__line"></div>
+                </div>
+              )}
+              <div id={`turn-${index}`}>
+                <Turn
+                  turn={turn}
+                  index={index}
+                  canRegenerate={canRegenerate}
+                  onRegenerate={canRegenerate ? () => onRegenerateTurn(index) : null}
+                  onUndo={onUndoTurn ? () => onUndoTurn(index) : null}
+                  onFork={onForkFromTurn ? () => onForkFromTurn(index) : null}
+                  isLoading={isLoading}
+                  isApiKeySet={isApiKeySet}
+                  isForkPoint={isForkPoint}
+                />
+              </div>
+            </React.Fragment>
           );
 
           // Attach ref to fork point for scrolling

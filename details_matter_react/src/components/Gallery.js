@@ -40,6 +40,20 @@ const Gallery = ({
     setLoadingCloud(false);
   };
 
+  // Wrapper for upload that refreshes cloud gallery after success
+  const handleUploadToCloud = async (thread) => {
+    if (!onUploadToCloud) return;
+    try {
+      await onUploadToCloud(thread);
+      // Refresh cloud gallery after successful publish
+      setTimeout(() => {
+        loadCloudGallery();
+      }, 500); // Small delay to ensure backend has updated
+    } catch (err) {
+      console.error('Publish failed:', err);
+    }
+  };
+
   // eslint-disable-next-line no-unused-vars
   const handleSaveConfig = () => {
     setWorkerUrl(workerUrlInput);
@@ -50,13 +64,17 @@ const Gallery = ({
     // Get preview images for thread cards
     // For forks: show first image AFTER the fork point (what makes this branch unique)
     // Fallback: fork-point image, then first available image
+    // For non-forks: show images from the beginning
     if (thread?.conversation && Array.isArray(thread.conversation)) {
-      const forkTurn = Number.isFinite(thread?.forkInfo?.parentTurn) ? thread.forkInfo.parentTurn : null;
       const images = thread.conversation
         .map((t, idx) => ({ idx, img: t?.image }))
         .filter(x => !!x.img);
 
-      if (forkTurn !== null) {
+      // Only treat as fork if we have both a valid parentId AND a valid parentTurn
+      const hasForkInfo = thread?.forkInfo?.parentId && Number.isFinite(thread?.forkInfo?.parentTurn);
+
+      if (hasForkInfo) {
+        const forkTurn = thread.forkInfo.parentTurn;
         // It's a fork - prioritize images after the fork point
         const postFork = images.filter(x => x.idx > forkTurn).map(x => x.img);
         if (postFork.length > 0) {
@@ -148,6 +166,14 @@ const Gallery = ({
         forkInfo,
       };
     }).filter(t => !!t.id);
+
+    // Sort by timestamp descending (newest first) for wall view
+    out.sort((a, b) => {
+      const at = a?.timestamp ? new Date(a.timestamp).getTime() : 0;
+      const bt = b?.timestamp ? new Date(b.timestamp).getTime() : 0;
+      return bt - at;
+    });
+
     return out;
   }, [threads]);
 
@@ -208,12 +234,24 @@ const Gallery = ({
 
   /* === Fantasy RPG Components === */
 
+  // State for two-click delete confirmation
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
+
+  // Auto-reset pending delete after 3 seconds
+  useEffect(() => {
+    if (pendingDeleteId) {
+      const timer = setTimeout(() => setPendingDeleteId(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [pendingDeleteId]);
+
   const RPGThreadCard = ({ thread, isCloud }) => {
     const images = getPreviewImages(thread);
     const title = thread.title || 'Untitled';
     const turnCount = thread.turnCount || (thread.conversation ? thread.conversation.length : '?');
     const parent = thread?.forkInfo?.parentId;
     const parentTurn = thread?.forkInfo?.parentTurn;
+    const isPendingDelete = pendingDeleteId === thread.id;
 
     // Get the very first image in the conversation (the origin) for the vignette
     // This is different from getPreviewImages which shows post-fork images for forks
@@ -226,14 +264,27 @@ const Gallery = ({
       return thread?.forkInfo?.parentImage || null;
     })();
 
+    const handleDeleteClick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (isPendingDelete) {
+        // Second click - actually delete
+        setPendingDeleteId(null);
+        onDeleteThread(thread.id);
+      } else {
+        // First click - show confirmation
+        setPendingDeleteId(thread.id);
+      }
+    };
+
     return (
-      <div className="rpg-card" onClick={() => onOpenThread(thread, isCloud)}>
+      <div className="rpg-card">
         {/* Fork Vignette Indicator - shows the ORIGIN (first image) */}
         {parent && (
           <div
             className="rpg-card__fork-indicator"
             title={`Forked from previous thread${parentTurn !== undefined ? ` at turn ${parentTurn}` : ''}`}
-            onClick={(e) => { e.stopPropagation(); }}
           >
             {originImage ? (
               <img src={originImage} alt="fork origin" className="rpg-card__fork-img" />
@@ -243,8 +294,107 @@ const Gallery = ({
           </div>
         )}
 
+        {/* LEFT RIBBON - Storage: always 'Local Study' for local threads */}
+        {!isCloud && (
+          <div
+            className="rpg-card__heritage-ribbon"
+            title="Stored in your Local Study"
+            style={{
+              position: 'absolute',
+              top: '6px',
+              left: '4px',
+              background: 'linear-gradient(to right, #e8ede3, #d4dbcd)',
+              padding: '2px 8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '9px',
+              fontWeight: 800,
+              color: '#3d4a35',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+              border: '1.5px solid #8b9a7d',
+              borderRadius: '2px',
+              fontFamily: "'Cinzel', serif",
+              letterSpacing: '0.8px',
+              textTransform: 'uppercase',
+              zIndex: 60,
+              clipPath: 'polygon(0% 0%, 100% 0%, 95% 50%, 100% 100%, 0% 100%, 5% 50%)'
+            }}
+          >
+            Local Study
+          </div>
+        )}
+
+        {/* LEFT RIBBON - For cloud threads, show 'Published' */}
+        {isCloud && (
+          <div
+            className="rpg-card__heritage-ribbon"
+            title="Part of the Grand Exhibition"
+            style={{
+              position: 'absolute',
+              top: '6px',
+              left: '4px',
+              background: 'linear-gradient(to right, #f2e1c9, #e8d0ae)',
+              padding: '2px 8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontSize: '9px',
+              fontWeight: 800,
+              color: '#3d2b1f',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+              border: '1.5px solid #a67c52',
+              borderRadius: '2px',
+              fontFamily: "'Cinzel', serif",
+              letterSpacing: '0.8px',
+              textTransform: 'uppercase',
+              zIndex: 60,
+              clipPath: 'polygon(0% 0%, 100% 0%, 95% 50%, 100% 100%, 0% 100%, 5% 50%)'
+            }}
+          >
+            Published
+          </div>
+        )}
+
+        {/* RIGHT RIBBON - Heritage: 'From Exhibition' if forked from cloud */}
+        {thread?.forkInfo?.isParentCloud && (
+          <div
+            title="Forked from a Published Thread"
+            style={{
+              position: 'absolute',
+              top: '6px',
+              right: '4px',
+              background: 'linear-gradient(to left, #f2e1c9, #e8d0ae)',
+              padding: '2px 8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '8px',
+              fontWeight: 800,
+              color: '#3d2b1f',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+              border: '1.5px solid #a67c52',
+              borderRadius: '2px',
+              fontFamily: "'Cinzel', serif",
+              letterSpacing: '0.5px',
+              textTransform: 'uppercase',
+              zIndex: 60,
+              clipPath: 'polygon(5% 0%, 100% 0%, 100% 100%, 5% 100%, 0% 50%)'
+            }}
+          >
+            🏛️ Forked
+          </div>
+        )}
+
+
+
         <div className="rpg-card__frame">
-          <div className="rpg-card__imageContainer">
+          {/* Only clicking the image opens the thread */}
+          <div
+            className="rpg-card__imageContainer"
+            onClick={() => onOpenThread(thread, isCloud)}
+            style={{ cursor: 'pointer' }}
+          >
             {images[0] ? (
               <img src={images[0]} alt="preview" className="rpg-card__image" loading="lazy" />
             ) : (
@@ -263,37 +413,70 @@ const Gallery = ({
             <div className="rpg-card__actions">
               <button
                 className="rpg-btn-small"
-                onClick={(e) => { e.stopPropagation(); onForkThread(thread, isCloud); }}
+                onClick={() => onForkThread(thread, isCloud)}
               >
                 🌱 Fork
               </button>
               <button
                 className="rpg-btn-small"
-                onClick={(e) => { e.stopPropagation(); setGenealogyThreadId(thread.id); }}
+                onClick={() => window.location.hash = `#/lineage/${thread.id}`}
               >
                 🌳 Lineage
               </button>
-              {!isCloud && onUploadToCloud && (
-                <button
-                  className="rpg-btn-small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onUploadToCloud(thread);
-                  }}
-                  title="Upload to Cloud"
-                >
-                  ☁️ Upload
-                </button>
-              )}
+              {/* Sync-aware Publish/Sync button */}
+              {!isCloud && onUploadToCloud && (() => {
+                const isPublished = !!thread.publishedAt;
+                const currentTurnCount = Number(thread.conversation?.length) || 0;
+                const publishedCount = Number(thread.publishedTurnCount) || 0;
+                const isSynced = isPublished && (publishedCount === currentTurnCount);
+
+                if (!isPublished) {
+                  // Never published
+                  return (
+                    <button
+                      className="rpg-btn-small"
+                      onClick={() => handleUploadToCloud(thread)}
+                      title="Publish to the Grand Exhibition"
+                    >
+                      🏛️ Publish
+                    </button>
+                  );
+                } else if (isSynced) {
+                  // Published and in sync
+                  return (
+                    <span
+                      className="rpg-btn-small"
+                      style={{
+                        background: 'linear-gradient(to bottom, #5c6a51, #3d4a35)',
+                        color: '#a8d4a0',
+                        cursor: 'default'
+                      }}
+                      title="Published and synchronized"
+                    >
+                      ✓ Synced
+                    </span>
+                  );
+                } else {
+                  // Published but out of sync
+                  return (
+                    <button
+                      className="rpg-btn-small"
+                      onClick={() => handleUploadToCloud(thread)}
+                      title="Your local version has new changes - click to sync"
+                      style={{ background: 'linear-gradient(to bottom, #c4a35a, #8b6914)' }}
+                    >
+                      ⚠️ Sync
+                    </button>
+                  );
+                }
+              })()}
               {!isCloud && onDeleteThread && (
                 <button
-                  className="rpg-btn-small rpg-btn-danger"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteThread(thread.id);
-                  }}
+                  className={`rpg-btn-small ${isPendingDelete ? 'rpg-btn-confirm' : 'rpg-btn-danger'}`}
+                  onClick={handleDeleteClick}
+                  title={isPendingDelete ? 'Click again to confirm deletion' : 'Delete thread'}
                 >
-                  🗑️
+                  {isPendingDelete ? '⚠️ Confirm?' : '🗑️'}
                 </button>
               )}
             </div>
@@ -325,7 +508,7 @@ const Gallery = ({
               className={`rpg-jewel-btn blue ${activeTab === 'cloud' ? 'active' : ''}`}
               onClick={() => setActiveTab('cloud')}
             >
-              Cloud
+              Published
             </button>
           </div>
 
@@ -339,9 +522,9 @@ const Gallery = ({
       <main className="rpg-main">
         {activeTab === 'cloud' && (
           <div className="rpg-notice-panel">
-             <div style={{ textAlign: 'center', marginBottom: 10 }}>
-                <button className="rpg-btn-text" onClick={loadCloudGallery}>🔄 Refresh Cloud Gallery</button>
-              </div>
+            <div style={{ textAlign: 'center', marginBottom: 10 }}>
+              <button className="rpg-btn-text" onClick={loadCloudGallery}>🔄 Refresh Cloud Gallery</button>
+            </div>
           </div>
         )}
 
@@ -382,7 +565,7 @@ const Gallery = ({
             tree={tree}
             getPreviewImages={getPreviewImages}
             onSelectThread={setGenealogyThreadId}
-            onOpenThread={(t) => onOpenThread(t, activeTab === 'cloud')}
+            onOpenThread={(t) => onOpenThread(t, t.isRemote || activeTab === 'cloud')}
             onBack={() => setGenealogyThreadId(null)}
           />
         )}
