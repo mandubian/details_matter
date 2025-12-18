@@ -70,7 +70,6 @@ function App() {
   const [currentTurn, setCurrentTurn] = useState(initialState.currentTurn);
   const [style, setStyle] = useState(initialState.style);
   const [model, setModel] = useState(initialState.model);
-  const [initialImage, setInitialImage] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
@@ -81,6 +80,7 @@ function App() {
   // Gallery-first: always land on the gallery.
   // We'll show a "Resume last session" card there if conversation exists.
   const [view, setView] = useState('gallery');
+  const [isRemote, setIsRemote] = useState(false); // Track if current thread is cloud/read-only
   const [isMobile, setIsMobile] = useState(() => window.matchMedia?.('(max-width: 768px)')?.matches ?? false);
   const [showSettings, setShowSettings] = useState(false);
   // Collapsed sidebar state lifted from Sidebar component
@@ -95,6 +95,9 @@ function App() {
   // eslint-disable-next-line no-unused-vars
   const [autoSaveError, setAutoSaveError] = useState(null);
   const [lastSnapshotSig, setLastSnapshotSig] = useState('');
+
+  // Track if initial data has been loaded from IndexedDB to prevent race conditions
+  const dataLoadedRef = React.useRef(false);
 
   // Async load gallery and forkInfo from IndexedDB
   useEffect(() => {
@@ -142,6 +145,10 @@ function App() {
         }
       } catch (err) {
         console.error('Failed to load data from DB:', err);
+      } finally {
+        // Mark data as loaded to enable persistence effects
+        dataLoadedRef.current = true;
+        console.log('✅ Initial data load complete, persistence enabled');
       }
     };
     loadAsyncData();
@@ -210,8 +217,8 @@ function App() {
   // Removed accessToken persistence logic
 
   useEffect(() => {
-    // Only save non-empty conversations (prevents clearing on initial mount)
-    if (conversation.length > 0) {
+    // Only save non-empty conversations AND after initial load is complete
+    if (conversation.length > 0 && dataLoadedRef.current) {
       // Save to IndexedDB (unlimited storage)
       saveKey('active_conversation', conversation)
         .then(() => console.log('💾 Saved conversation to IndexedDB:', conversation.length, 'turns'))
@@ -235,13 +242,20 @@ function App() {
   }, [model]);
 
   useEffect(() => {
-    localStorage.setItem('details_matter_thread_id', threadId);
+    // Only persist threadId after initial load to prevent overwriting restored ID
+    if (dataLoadedRef.current) {
+      localStorage.setItem('details_matter_thread_id', threadId);
+    }
   }, [threadId]);
 
   // Persist Gallery to IndexedDB (replacing localStorage)
   useEffect(() => {
-    // Only save if gallery has been loaded (not null)
+    // Only save if gallery has been loaded (not null) AND initial load is complete
     if (gallery === null) return;
+    if (!dataLoadedRef.current) {
+      console.log('⏳ Skipping gallery save - initial load not complete');
+      return;
+    }
 
     // Defensive deduplication before saving to IDB
     const seen = new Set();
@@ -268,10 +282,18 @@ function App() {
     });
   }, [gallery]);
 
-  // Persist ForkInfo to IndexedDB
+  // Persist ForkInfo to IndexedDB (save when set, delete when cleared)
   useEffect(() => {
+    // Skip until initial load is complete to prevent deleting data before it's loaded
+    if (!dataLoadedRef.current) {
+      console.log('⏳ Skipping forkInfo persistence - initial load not complete');
+      return;
+    }
+
     if (forkInfo) {
       saveKey('fork_info', forkInfo);
+    } else {
+      deleteKey('fork_info').catch(console.error);
     }
   }, [forkInfo]);
 
@@ -316,19 +338,6 @@ function App() {
     setModel(newModel);
   };
 
-  // Handle initial image upload
-  const handleInitialImageUpload = (file) => {
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setInitialImage(e.target.result);
-      };
-      reader.readAsDataURL(file);
-    } else {
-      setInitialImage(null);
-    }
-  };
-
   // Clear messages
   const clearMessages = () => {
     setError(null);
@@ -363,21 +372,73 @@ function App() {
   const handleUploadGalleryThreadToCloud = async (thread) => {
     setIsLoading(true);
     try {
+      // Calculate the best thumbnail for this thread
+      // For forks: use the NEWEST image (what makes this fork unique)
+      // For non-forks: use the first image
+      let thumbnail = null;
+      if (thread.conversation && Array.isArray(thread.conversation)) {
+        const images = thread.conversation
+          .map((t, idx) => ({ idx, img: t?.image }))
+          .filter(x => !!x.img);
+
+        const hasForkInfo = thread?.forkInfo?.parentId && Number.isFinite(thread?.forkInfo?.parentTurn);
+
+        if (hasForkInfo) {
+          const forkTurn = thread.forkInfo.parentTurn;
+          // Prioritize images after the fork point (newest unique content)
+          const postFork = images.filter(x => x.idx > forkTurn);
+          if (postFork.length > 0) {
+            // Use the latest post-fork image
+            thumbnail = postFork[postFork.length - 1].img;
+          } else if (images.length > 0) {
+            // Fallback to last image in thread
+            thumbnail = images[images.length - 1].img;
+          }
+        } else if (images.length > 0) {
+          // Non-fork: use first image
+          thumbnail = images[0].img;
+        }
+      }
+
       const threadData = {
         threadId: thread.id || thread.threadId,
         conversation: thread.conversation,
         style: thread.style,
         model: thread.model,
         forkInfo: thread.forkInfo,
-        timestamp: thread.timestamp || new Date().toISOString()
+        timestamp: thread.timestamp || new Date().toISOString(),
+        thumbnail, // Explicit thumbnail for gallery display
+        title: thread.title || thread.conversation?.[0]?.text?.slice(0, 80) || 'Untitled Thread'
       };
 
-      const result = await uploadThread(threadData);
-      setSuccess(`Uploaded "${thread.title || 'Thread'}" to Cloud! ID: ${result.id}`);
+      await uploadThread(threadData);
+
+      // Update local gallery entry with publication tracking
+      const threadId = thread.id || thread.threadId;
+      const turnCount = thread.conversation?.length || 0;
+
+      setGallery(prev => {
+        if (!prev) return prev;
+        const updated = prev.map(entry => {
+          if (entry.id === threadId) {
+            return {
+              ...entry,
+              publishedAt: new Date().toISOString(),
+              publishedTurnCount: turnCount
+            };
+          }
+          return entry;
+        });
+        // Persist the updated gallery
+        saveGallery(updated).catch(console.error);
+        return updated;
+      });
+
+      setSuccess(`Published "${thread.title || 'Thread'}" to the Exhibition!`);
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
       console.error('Upload to cloud failed:', err);
-      setError('Failed to upload: ' + err.message);
+      setError('Failed to publish: ' + err.message);
     } finally {
       setIsLoading(false);
     }
@@ -403,7 +464,10 @@ function App() {
       timestamp,
       forkInfo: f || null,
       threadId: id,
-      thumbnail: compressedConv.find(t => t.image)?.image || null
+      thumbnail: compressedConv.find(t => t.image)?.image || null,
+      // Preserve publication tracking from existing entry
+      publishedAt: existingEntry?.publishedAt || null,
+      publishedTurnCount: existingEntry?.publishedTurnCount || null
     };
   };
 
@@ -464,25 +528,26 @@ function App() {
     }
   };
 
-  const handleDeleteFromGallery = async (id) => {
+  const handleDeleteFromGallery = (id) => {
     if (!id) return;
-    const ok = window.confirm('Delete this thread from local gallery? This cannot be undone.');
-    if (!ok) return;
 
-    try {
-      await deleteThread(id);
-      setGallery(prev => prev.filter(e => e.id !== id));
-      setSuccess('Deleted from local gallery.');
-      setTimeout(() => setSuccess(null), 2000);
-    } catch (err) {
-      console.error('Failed to delete thread:', err);
-      setError('Failed to delete thread from database.');
-    }
+    // Note: window.confirm is auto-dismissed in embedded browsers
+    // Consider adding a custom confirmation modal in the future
+    deleteThread(id)
+      .then(() => {
+        setGallery(prev => prev.filter(e => e.id !== id));
+        setSuccess('Deleted from local gallery.');
+        setTimeout(() => setSuccess(null), 2000);
+      })
+      .catch((err) => {
+        console.error('Failed to delete thread:', err);
+        setError('Failed to delete thread from database.');
+      });
   };
 
   // Auto-snapshot current thread into local gallery (compressed)
   useEffect(() => {
-    if (!autoSnapshotEnabled) return;
+    if (!autoSnapshotEnabled || isRemote) return;
     if (!threadId || !conversation || conversation.length === 0) return;
     // Only snapshot after we have at least one AI image or some meaningful progress
     const sig = `${threadId}:${conversation.length}:${conversation[conversation.length - 1]?.id || ''}`;
@@ -530,6 +595,7 @@ function App() {
         setForkInfo(data.forkInfo || null);
 
         setView('editor');
+        setIsRemote(isCloud);
         // setSuccess('Thread loaded successfully.');
       } else if (!isCloud) {
         // If not found in gallery, check if it matches current threadId (already loaded)
@@ -552,16 +618,17 @@ function App() {
     const newId = `thread-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
     setThreadId(newId);
     setForkInfo(null);
-    setInitialImage(null);
 
     // Clear persistence keys
     localStorage.removeItem('details_matter_conversation');
     deleteKey('active_conversation').catch(console.error);
+    deleteKey('fork_info').catch(console.error); // Also clear forkInfo from IndexedDB
     localStorage.removeItem('details_matter_current_turn');
     localStorage.removeItem('details_matter_thread_id');
     localStorage.removeItem('details_matter_fork_info');
 
     setView('editor');
+    setIsRemote(false);
     return newId;
   };
 
@@ -630,6 +697,7 @@ function App() {
 
       if (data.conversation) {
         const parentId = data.threadId || data.id;
+        const parentTitle = data.title || (data.conversation?.[0]?.text?.slice(0, 80)) || 'Untitled Thread';
         const parentTurn = Math.max(0, data.conversation.length - 1);
         const parentImage = data.conversation[parentTurn]?.image || null;
 
@@ -658,12 +726,15 @@ function App() {
           parentId,
           parentTurn,
           parentImage,
+          parentTitle,
+          isParentCloud: isCloud,
           // Content lineage tracking
           originThreadId,
           originTurnIndex
         });
 
         setView('editor');
+        setIsRemote(false);
         setSuccess('Fork created. You can now continue from this thread.');
         setTimeout(() => setSuccess(null), 3000);
 
@@ -679,6 +750,7 @@ function App() {
   const handleForkFromTurn = (turnIndex) => {
     if (!conversation || conversation.length === 0) return;
     const parentId = threadId;
+    const parentTitle = conversation?.[0]?.text?.slice(0, 80) || 'Untitled Thread';
     const idx = Math.max(0, Math.min(turnIndex, conversation.length - 1));
 
     // Prefer image at chosen turn; fall back to nearest previous image
@@ -720,10 +792,13 @@ function App() {
       parentId,
       parentTurn: idx,
       parentImage,
+      parentTitle,
+      isParentCloud: isRemote,
       originThreadId,
       originTurnIndex
     });
     setView('editor');
+    setIsRemote(false);
 
     setSuccess(`Fork created from turn ${idx}. You can now continue from this branch.`);
     setTimeout(() => setSuccess(null), 3000);
@@ -732,11 +807,6 @@ function App() {
   };
 
   const handleNewThread = () => {
-    // If we are already in editor with content, confirm
-    if (conversation.length > 0) {
-      if (!window.confirm('Start a new thread? Unsaved progress will be lost.')) return;
-    }
-
     // Snapshot the current thread first, so we don't lose it
     if (conversation.length > 0) {
       saveThreadToLocalGallery({ id: threadId, conv: conversation, s: style, m: model, f: forkInfo, silent: true })
@@ -766,14 +836,37 @@ function App() {
         onForkThread={(t, isCloud) => handleForkThread(t, isCloud)}
         onDeleteThread={(id) => handleDeleteFromGallery(id)}
         onUploadToCloud={handleUploadGalleryThreadToCloud}
+        isRemote={isRemote}
       />
     );
   }
 
-  const handleDetachFork = () => {
+  const handleDetachFork = async () => {
     setForkInfo(null);
-    setSuccess('Fork info removed. Please save to gallery to make it permanent.');
-    setTimeout(() => setSuccess(null), 3000);
+
+    // Auto-save to gallery immediately with cleared forkInfo
+    // IMPORTANT: Use silent: false to force save even if conversation length unchanged
+    // This ensures forkInfo changes are persisted to gallery
+    if (conversation.length > 0) {
+      try {
+        await saveThreadToLocalGallery({
+          id: threadId,
+          conv: conversation,
+          s: style,
+          m: model,
+          f: null, // Explicitly pass null forkInfo
+          silent: false // Force save, don't skip based on length check
+        });
+        // Success message set by saveThreadToLocalGallery
+      } catch (err) {
+        console.error('Failed to save after detach:', err);
+        setError('Fork removed but failed to save. Please save manually.');
+        setTimeout(() => setError(null), 3000);
+      }
+    } else {
+      setSuccess('Fork info cleared.');
+      setTimeout(() => setSuccess(null), 3000);
+    }
   };
 
   const sidebarProps = {
@@ -800,6 +893,8 @@ function App() {
     onNewThread: handleNewThread,
     isCollapsed: isSidebarCollapsed,
     onToggle: toggleSidebar,
+    isRemote: isRemote,
+    onForkCloud: () => handleForkThread({ id: threadId, conversation, style, model, forkInfo }, isRemote)
   };
 
   return (
@@ -841,8 +936,6 @@ function App() {
           style={style}
           onStyleChange={handleStyleChange}
           model={model}
-          initialImage={initialImage}
-          onInitialImageUpload={handleInitialImageUpload}
           isApiKeySet={isApiKeySet}
           isLoading={isLoading}
           setIsLoading={setIsLoading}
@@ -854,6 +947,9 @@ function App() {
           forkInfo={forkInfo}
           threadId={threadId}
           onForkFromTurn={handleForkFromTurn}
+          isRemote={isRemote}
+          onForkThread={() => handleForkThread({ id: threadId, conversation, style, model, forkInfo }, isRemote)}
+          onUploadThread={() => handleUploadGalleryThreadToCloud({ id: threadId, conversation, style, model, forkInfo })}
         />
       </div>
 
@@ -873,3 +969,4 @@ function App() {
 }
 
 export default App;
+

@@ -26,7 +26,9 @@ const Sidebar = ({
   onDetachFork,
   gallery,
   isCollapsed,
-  onToggle
+  onToggle,
+  isRemote,
+  onForkCloud
 }) => {
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [overrideKeyInput, setOverrideKeyInput] = useState('');
@@ -253,7 +255,7 @@ const Sidebar = ({
           {/* Share / Gallery Section */}
           {isApiKeySet && (
             <div className="section">
-              <h3>🌐 Share & Gallery</h3>
+              <h3>🏛️ Exhibition & Gallery</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <button
                   className="danger-button"
@@ -264,21 +266,32 @@ const Sidebar = ({
                 </button>
 
                 <button className="primary-button" onClick={onOpenGallery} disabled={isLoading}>
-                  📂 Open Gallery (Local & Cloud)
+                  📂 Enter the Gallery
                 </button>
 
                 <button className="secondary-button" onClick={onAddToGallery} disabled={isLoading}>
-                  💾 Save to Local Gallery
+                  {isRemote ? '📥 Clone to Local Gallery' : '💾 Save to Local Gallery'}
                 </button>
 
-                {conversation.length > 0 && (
+                {isRemote && (
+                  <button
+                    className="primary-button"
+                    onClick={onForkCloud}
+                    disabled={isLoading}
+                    style={{ background: 'var(--accent-color)' }}
+                  >
+                    🌱 Fork this Thread
+                  </button>
+                )}
+
+                {!isRemote && conversation.length > 0 && (
                   <button
                     className="secondary-button"
                     onClick={onPublishCloud}
                     disabled={isLoading}
-                    title="Upload to Cloudflare R2 (Requires Config)"
+                    title="Publish to the Grand Exhibition"
                   >
-                    ☁️ Publish to Cloud
+                    🏛️ Publish to the Exhibition
                   </button>
                 )}
 
