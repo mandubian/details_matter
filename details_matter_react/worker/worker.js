@@ -78,7 +78,7 @@ export default {
                   // but let's check to avoid bandwidth if possible? Actually, R2 Class A ops (put) cost money.
                   // Checking head (Class B) is cheaper.
                   const exists = await env.GALLERY_BUCKET.head(imageKey);
-                  
+
                   if (!exists) {
                     const binary = base64ToArrayBuffer(base64Data);
                     await env.GALLERY_BUCKET.put(imageKey, binary, {
@@ -108,7 +108,7 @@ export default {
           model: data.model,
           forkInfo: data.forkInfo,
           // Store first image thumbnail if available
-          thumbnail: data.conversation.find(t => t.image)?.image || null
+          thumbnail: data.thumbnail || data.conversation.find(t => t.image)?.image || null
         };
 
         // Store full thread in R2 (now lightweight)
@@ -196,6 +196,7 @@ export default {
     return new Response('Not Found', { status: 404, headers: corsHeaders });
   }
 };
+
 
 
 

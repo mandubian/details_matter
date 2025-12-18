@@ -3,9 +3,6 @@ import React, { useState } from 'react';
 const InitialSetup = ({
   initialPrompt,
   setInitialPrompt,
-  onFileUpload,
-  uploadedFile,
-  initialImage,
   onStartEvolution,
   isApiKeySet,
   isLoading,
@@ -13,92 +10,130 @@ const InitialSetup = ({
 }) => {
   const [showHelp, setShowHelp] = useState(true);
 
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    onFileUpload(file);
-  };
-
   return (
     <div className="controls-section">
       {showHelp && (
-        <div className="expander">
+        <div style={{
+          background: 'rgba(139, 90, 43, 0.08)',
+          border: '1px solid rgba(139, 90, 43, 0.25)',
+          borderRadius: '8px',
+          padding: '16px 18px',
+          marginBottom: '24px'
+        }}>
           <div
-            className="expander-header"
             onClick={() => setShowHelp(false)}
-            style={{ color: 'var(--text-primary)' }}
+            style={{
+              color: '#8b5a2b',
+              cursor: 'pointer',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontWeight: 600,
+              fontSize: '0.95rem'
+            }}
           >
-            <span>How to start (quick)</span>
-            <span>▼</span>
+            <span>Getting Started</span>
+            <span style={{ fontSize: '0.75rem', opacity: 0.7 }}>× dismiss</span>
           </div>
-          <div className="expander-content" style={{ color: 'var(--text-secondary)' }}>
-            <ol style={{ paddingLeft: '20px' }}>
-              <li>Set or paste a Gemini API key in the settings (sidebar/bottom).</li>
-              <li>Enter an initial prompt below.</li>
-              <li>(Optional) Upload an initial image.</li>
-              <li>Click 'Begin Single-Model Evolution'.</li>
-            </ol>
-            <p style={{marginTop: '10px'}}><strong>Note:</strong> All data is stored locally in your browser.</p>
+          <div style={{ color: '#5c4033', marginTop: '14px', lineHeight: 1.7 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <div><strong>1.</strong> Add your Gemini API key in Settings</div>
+              <div><strong>2.</strong> Describe your initial scene below</div>
+              <div><strong>3.</strong> Begin the evolution</div>
+            </div>
+            <div style={{
+              marginTop: '16px',
+              padding: '10px 14px',
+              background: 'rgba(139, 90, 43, 0.06)',
+              borderRadius: '6px',
+              fontSize: '0.85rem',
+              color: '#6b4423',
+              fontStyle: 'italic'
+            }}>
+              Your API key stays in your browser — open source, verify the code.
+            </div>
           </div>
         </div>
       )}
 
-      <h2 style={{ color: 'var(--text-primary)' }}>🚀 Start Evolution</h2>
+      <h2 style={{
+        color: '#3d2914',
+        fontWeight: 500,
+        fontSize: '1.4rem',
+        marginBottom: '20px',
+        borderBottom: '1px solid rgba(139, 90, 43, 0.2)',
+        paddingBottom: '12px'
+      }}>
+        Begin Your Detail Journey
+      </h2>
 
       <div style={{ marginBottom: '24px' }}>
-        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold', color: 'var(--text-primary)' }}>
-          Initial Prompt / Scene Setup
+        <label style={{
+          display: 'block',
+          marginBottom: '10px',
+          fontWeight: 600,
+          color: '#5c4033',
+          fontSize: '0.95rem'
+        }}>
+          Initial Vision
         </label>
         <textarea
-          placeholder="Describe starting point... e.g., 'A mysterious forest with glowing trees'"
+          placeholder="Describe the scene you wish to explore... A forgotten library with ancient tomes, a moonlit garden with hidden paths..."
           value={initialPrompt}
           onChange={(e) => setInitialPrompt(e.target.value)}
           rows={4}
+          style={{
+            background: 'rgba(255, 255, 255, 0.9)',
+            border: '1px solid rgba(139, 90, 43, 0.3)',
+            borderRadius: '8px',
+            padding: '12px 14px',
+            fontSize: '1rem',
+            lineHeight: 1.6,
+            color: '#3d2914',
+            resize: 'vertical'
+          }}
         />
-      </div>
-
-      <div className="file-input">
-        <label style={{ marginBottom: '12px', display: 'block' }}>Upload Initial Image (Optional)</label>
-        <input
-          type="file"
-          accept="image/*"
-          onChange={handleFileChange}
-          style={{ padding: '0', border: 'none' }} 
-        />
-        {/* Note: file input styling is tricky, often better to wrap or use label as trigger */}
-        
-        {initialImage && (
-          <div className="image-preview">
-            <img src={initialImage} alt="Initial upload preview" />
-            <p>Initial uploaded image</p>
-          </div>
-        )}
       </div>
 
       <button
         onClick={onStartEvolution}
         disabled={!isApiKeySet || isLoading || !initialPrompt.trim()}
         className="primary-button"
-        style={{ width: '100%', marginTop: '20px' }}
+        style={{
+          width: '100%',
+          marginTop: '16px',
+          padding: '14px 20px',
+          fontSize: '1rem',
+          fontWeight: 600
+        }}
       >
         {isLoading ? (
-          <span className="loading" style={{color: 'white'}}>
-            <span className="spinner" style={{borderColor: 'white', borderTopColor: 'transparent'}}></span>
-            Generating first image...
+          <span className="loading" style={{ color: 'white' }}>
+            <span className="spinner" style={{ borderColor: 'white', borderTopColor: 'transparent' }}></span>
+            Conjuring first image...
           </span>
         ) : (
-          '🎬 Begin Single-Model Evolution'
+          'Begin Evolution'
         )}
       </button>
 
       {!isApiKeySet && (
-        <div className="warning" style={{ marginTop: '15px' }}>
-          Please set your Gemini API key in the sidebar to begin generation.
+        <div className="warning" style={{ marginTop: '16px', fontSize: '0.9rem' }}>
+          Please set your Gemini API key in Settings to begin.
         </div>
       )}
 
-      {initialPrompt.trim() === '' && (
-        <div className="warning" style={{ marginTop: '15px' }}>
-          Please enter an initial prompt to begin the evolution.
+      {isApiKeySet && initialPrompt.trim() === '' && (
+        <div style={{
+          marginTop: '16px',
+          padding: '12px',
+          background: 'rgba(139, 90, 43, 0.06)',
+          borderRadius: '6px',
+          color: '#6b4423',
+          fontSize: '0.9rem',
+          textAlign: 'center'
+        }}>
+          Enter your initial vision to begin the journey.
         </div>
       )}
     </div>
