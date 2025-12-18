@@ -41,10 +41,8 @@ export const initDB = () => {
     });
 };
 
-// Save the entire gallery (overwrite/update)
-// Note: In IDB, we usually put items individually, but to match current app structure 
-// we'll handle the array. Ideally, we store each thread as a row.
-// Let's store each thread individually for better performance and scalability.
+// Save the entire gallery (upsert + prune pattern for safety)
+// This avoids the dangerous clear+rewrite that can lose data if React state is stale
 export const saveGallery = async (threads = []) => {
     const db = await initDB();
     return new Promise((resolve, reject) => {
@@ -54,15 +52,25 @@ export const saveGallery = async (threads = []) => {
         transaction.oncomplete = () => resolve();
         transaction.onerror = (event) => reject(event.target.error);
 
-        // Clear and rewrite (simplest for sync with React state for now)
-        // Optimization for later: only update changed threads
-        const clearReq = store.clear();
+        // Get current IDs we want to keep
+        const newIds = new Set((threads || []).map(t => t.id).filter(Boolean));
 
-        clearReq.onsuccess = () => {
+        // First, get all existing IDs to find ones to delete
+        const getAllReq = store.getAllKeys();
+        getAllReq.onsuccess = () => {
+            const existingIds = getAllReq.result || [];
+
+            // Delete threads that are no longer in the list
+            for (const existingId of existingIds) {
+                if (!newIds.has(existingId)) {
+                    store.delete(existingId);
+                }
+            }
+
+            // Upsert all current threads
             (threads || []).forEach(thread => {
-                // Ensure ID
-                const item = { ...thread, id: thread.id || Date.now() };
-                store.put(item);
+                if (!thread.id) return; // Skip threads without ID
+                store.put({ ...thread });
             });
         };
     });
