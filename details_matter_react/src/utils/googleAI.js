@@ -176,6 +176,10 @@ const performGenerateCall = async (model, contents) => {
     return await genAI.models.generateContent({
       model,
       contents,
+      config: {
+        // Explicitly request image output alongside text
+        responseModalities: ['TEXT', 'IMAGE'],
+      },
     });
   } else {
     throw new Error("No API Key available");
@@ -225,7 +229,16 @@ export const generateContent = async (prompt, context = "", previousImage = null
     // Extract text and image from the response.
     // In @google/genai v0.3.x, response is a GenerateContentResponse with response.candidates.
     const candidates = response?.candidates || response?.response?.candidates || [];
-    const parts = candidates?.[0]?.content?.parts || [];
+    const candidate = candidates?.[0];
+    const parts = candidate?.content?.parts || [];
+
+    // Check for IMAGE_OTHER finishReason (API declined to generate image)
+    const finishReason = candidate?.finishReason;
+    const finishMessage = candidate?.finishMessage;
+    if (finishReason === 'IMAGE_OTHER') {
+      console.warn('Image generation declined by API:', finishReason, finishMessage);
+      // Continue to try fallback, but log the issue
+    }
 
     let text = response?.text || null; // SDK helper
     if (!text && candidates.length > 0) {
@@ -243,16 +256,24 @@ export const generateContent = async (prompt, context = "", previousImage = null
       }
     }
 
-    // If no image was found but we have text, try to generate image-only
-    if (!image && text) {
+    // If no image was found, try fallback generation
+    if (!image) {
       try {
-        console.log('No image in initial response, attempting image-only generation...');
+        // If we got IMAGE_OTHER, try with a simpler prompt
+        const fallbackPrompt = text || 'Generate a creative artistic image';
+        console.log('No image in initial response (finishReason:', finishReason, '), attempting fallback with simplified prompt...');
 
-        const imageOnlyContents = [{ role: 'user', parts: [{ text }] }];
+        const imageOnlyContents = [{ role: 'user', parts: [{ text: `Create an image: ${fallbackPrompt}` }] }];
         const imageOnlyResponse = await performGenerateCall(model, imageOnlyContents);
 
         const imageCandidates = imageOnlyResponse?.candidates || imageOnlyResponse?.response?.candidates || [];
-        const imageParts = imageCandidates?.[0]?.content?.parts || [];
+        const imageCandidate = imageCandidates?.[0];
+        const imageParts = imageCandidate?.content?.parts || [];
+
+        // Check if fallback also got rejected
+        if (imageCandidate?.finishReason === 'IMAGE_OTHER') {
+          console.warn('Fallback also rejected:', imageCandidate?.finishMessage);
+        }
 
         for (const part of imageParts) {
           if (part?.inlineData?.data && part?.inlineData?.mimeType) {
@@ -266,7 +287,14 @@ export const generateContent = async (prompt, context = "", previousImage = null
       }
     }
 
-    return { text, image, metrics: { requestBytes, imageDecodedBytes } };
+    // Return result with finishReason for debugging
+    return {
+      text,
+      image,
+      metrics: { requestBytes, imageDecodedBytes },
+      finishReason,
+      finishMessage
+    };
 
   } catch (error) {
     console.error('Error generating content:', error);

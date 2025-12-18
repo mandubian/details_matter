@@ -56,7 +56,7 @@ const Turn = ({ turn, index, canRegenerate = false, onRegenerate, onUndo, onFork
             <div className="error" style={{ margin: '20px' }}>
               <strong>⚠️ No image generated</strong>
               <p style={{ margin: '8px 0 0 0', fontSize: '0.85rem' }}>
-                {turn.error || "The model generated text but failed to produce an image."}
+                {turn.error || "The model generated text but failed to produce an image... Try again later, providers are often overloaded"}
               </p>
               {turn.error && (
                 <details style={{ marginTop: '10px', fontSize: '0.8rem' }}>
@@ -102,6 +102,11 @@ const Turn = ({ turn, index, canRegenerate = false, onRegenerate, onUndo, onFork
           {turn.model_name !== 'Human Input' && canRegenerate && onRegenerate && (
             <button className="turn-action-btn" onClick={onRegenerate} disabled={!isApiKeySet || isLoading}>
               🔄 Regenerate
+            </button>
+          )}
+          {turn.image && onUndo && (
+            <button className="turn-action-btn" onClick={onUndo} disabled={isLoading}>
+              ↩️ Undo
             </button>
           )}
         </div>

@@ -2,6 +2,7 @@
 export const compressImage = (dataUrl, maxWidth = 1280, quality = 0.8) => {
   return new Promise((resolve, reject) => {
     const img = new Image();
+    img.crossOrigin = "anonymous";
     img.src = dataUrl;
     img.onload = () => {
       const canvas = document.createElement('canvas');
@@ -41,6 +42,7 @@ export const compressConversation = async (conversation) => {
   }));
   return compressed;
 };
+
 
 
 
