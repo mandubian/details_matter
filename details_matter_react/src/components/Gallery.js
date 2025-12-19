@@ -41,7 +41,6 @@ const Gallery = ({
 
   // Search and pagination state
   const [searchQuery, setSearchQuery] = useState('');
-  const [cloudOffset, setCloudOffset] = useState(0);
   const [hasMoreCloud, setHasMoreCloud] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeoutRef = useRef(null);
@@ -77,7 +76,10 @@ const Gallery = ({
     }
   }, [hasEnteredExhibition]);
 
-  // Load cloud gallery - memoized to use as dependency
+  // Use ref for offset to avoid dependency cycles
+  const cloudOffsetRef = useRef(0);
+
+  // Load cloud gallery - memoized with stable dependencies
   const loadCloudGallery = useCallback(async (reset = true) => {
     setLoadingCloud(true);
     let loadedThreads = [];
@@ -89,19 +91,19 @@ const Gallery = ({
         loadedThreads = result.threads || [];
         setCloudThreads(loadedThreads);
         setHasMoreCloud(false); // Search doesn't support pagination yet
-        setCloudOffset(0);
+        cloudOffsetRef.current = 0;
         setIsSearching(false);
       } else {
         // Use offset-based paginated fetch
-        const offset = reset ? 0 : cloudOffset;
+        const offset = reset ? 0 : cloudOffsetRef.current;
         const result = await fetchCloudGalleryPage(offset, 20);
         loadedThreads = result.threads || [];
         if (reset) {
           setCloudThreads(loadedThreads);
-          setCloudOffset(loadedThreads.length);
+          cloudOffsetRef.current = loadedThreads.length;
         } else {
           setCloudThreads(prev => [...prev, ...loadedThreads]);
-          setCloudOffset(offset + loadedThreads.length);
+          cloudOffsetRef.current = offset + loadedThreads.length;
         }
         setHasMoreCloud(result.hasMore || false);
       }
@@ -115,7 +117,7 @@ const Gallery = ({
       console.error('Cloud gallery load error:', err);
     }
     setLoadingCloud(false);
-  }, [searchQuery, cloudOffset, onCloudGalleryLoaded]);
+  }, [searchQuery, onCloudGalleryLoaded]);
 
   // Load cloud gallery when tab switches or config changes
   useEffect(() => {
