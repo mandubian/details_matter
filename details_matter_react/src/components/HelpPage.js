@@ -90,7 +90,10 @@ const HelpPage = ({ onClose }) => {
 
                 <section className="help-page__section help-page__credits">
                     <p>
-                        Built with ❤️ using React and Google Gemini AI
+                        Built with ❤️ using React, Gemini 2.0 Flash, Claude Opus 4.5, and Nano Banana.
+                    </p>
+                    <p style={{ fontSize: '0.85rem', marginTop: '8px', fontStyle: 'italic' }}>
+                        The retro aesthetic is purposely inspired by Art Nouveau and tabletop card games—just for fun.
                     </p>
                     <p style={{ marginTop: '15px', fontSize: '0.9rem' }}>
                         💡 If you have Google AI API credits to share (so users don't need their own keys),
