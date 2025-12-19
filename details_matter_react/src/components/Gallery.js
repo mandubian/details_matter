@@ -78,8 +78,11 @@ const Gallery = ({
 
   // Use ref for offset to avoid dependency cycles
   const cloudOffsetRef = useRef(0);
+  // Use ref for callback to avoid dependency on potentially unstable prop
+  const onCloudGalleryLoadedRef = useRef(onCloudGalleryLoaded);
+  onCloudGalleryLoadedRef.current = onCloudGalleryLoaded;
 
-  // Load cloud gallery - memoized with stable dependencies
+  // Load cloud gallery - memoized with stable dependencies only
   const loadCloudGallery = useCallback(async (reset = true) => {
     setLoadingCloud(true);
     let loadedThreads = [];
@@ -110,14 +113,14 @@ const Gallery = ({
 
       // Notify parent with cloud threads so it can detect sync status
       // Pass full thread data to allow turn count comparison
-      if (onCloudGalleryLoaded && loadedThreads.length > 0) {
-        onCloudGalleryLoaded(loadedThreads.map(t => ({ id: t.id, turnCount: t.turnCount })));
+      if (onCloudGalleryLoadedRef.current && loadedThreads.length > 0) {
+        onCloudGalleryLoadedRef.current(loadedThreads.map(t => ({ id: t.id, turnCount: t.turnCount })));
       }
     } catch (err) {
       console.error('Cloud gallery load error:', err);
     }
     setLoadingCloud(false);
-  }, [searchQuery, onCloudGalleryLoaded]);
+  }, [searchQuery]); // Only depend on searchQuery, not on callback prop
 
   // Load cloud gallery when tab switches or config changes
   useEffect(() => {
