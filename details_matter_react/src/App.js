@@ -584,27 +584,48 @@ function App() {
       });
   };
 
-  // Called when cloud gallery is loaded - detect stale local publications
-  const handleCloudGalleryLoaded = (cloudIds) => {
+  // Called when cloud gallery is loaded - cross-reference with local to detect sync status
+  const handleCloudGalleryLoaded = (cloudThreads) => {
     if (!gallery || gallery.length === 0) return;
 
-    const cloudIdSet = new Set(cloudIds);
+    // Build a map of cloud thread id -> turnCount
+    const cloudMap = new Map();
+    for (const ct of cloudThreads) {
+      if (ct.id) cloudMap.set(ct.id, ct.turnCount || 0);
+    }
+
     const now = Date.now();
     const GRACE_PERIOD_MS = 60000; // 60 seconds grace period for just-published threads
-    let staleCount = 0;
+    let changes = 0;
 
     setGallery(prev => {
       if (!prev) return prev;
 
       const updated = prev.map(entry => {
-        // If this thread was published but no longer exists on cloud, clear publication status
-        // BUT: only if it was published more than 60 seconds ago (avoid race with just-published)
-        if (entry.publishedAt && !cloudIdSet.has(entry.id)) {
+        const cloudTurnCount = cloudMap.get(entry.id);
+
+        // Thread exists in cloud
+        if (cloudTurnCount !== undefined) {
+          // Set sync status if not already set
+          if (!entry.publishedAt) {
+            changes++;
+            console.log(`✅ Detected published thread: ${entry.id} (cloud: ${cloudTurnCount} turns, local: ${entry.conversation?.length || 0})`);
+            return {
+              ...entry,
+              publishedAt: new Date().toISOString(),
+              publishedTurnCount: cloudTurnCount
+            };
+          }
+          return entry;
+        }
+
+        // Thread was published but no longer exists on cloud - clear if old enough
+        if (entry.publishedAt && !cloudMap.has(entry.id)) {
           const publishedTime = new Date(entry.publishedAt).getTime();
           const ageMs = now - publishedTime;
 
           if (ageMs > GRACE_PERIOD_MS) {
-            staleCount++;
+            changes++;
             console.log(`🔄 Clearing stale publication for: ${entry.id} (age: ${Math.round(ageMs / 1000)}s)`);
             return {
               ...entry,
@@ -618,18 +639,13 @@ function App() {
         return entry;
       });
 
-      if (staleCount > 0) {
+      if (changes > 0) {
         // Persist the updated gallery
         saveGallery(updated).catch(console.error);
       }
 
       return updated;
     });
-
-    if (staleCount > 0) {
-      setSuccess(`Detected ${staleCount} thread(s) removed from cloud - cleared local sync status.`);
-      setTimeout(() => setSuccess(null), 3000);
-    }
   };
 
   // Auto-snapshot current thread into local gallery (compressed)

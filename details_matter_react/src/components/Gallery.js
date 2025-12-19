@@ -84,12 +84,14 @@ const Gallery = ({
 
   const loadCloudGallery = async (reset = true) => {
     setLoadingCloud(true);
+    let loadedThreads = [];
     try {
       if (searchQuery.trim()) {
         // Use search endpoint
         setIsSearching(true);
         const result = await searchCloudGallery(searchQuery, null, 20);
-        setCloudThreads(result.threads || []);
+        loadedThreads = result.threads || [];
+        setCloudThreads(loadedThreads);
         setHasMoreCloud(false); // Search doesn't support pagination yet
         setCloudOffset(0);
         setIsSearching(false);
@@ -97,20 +99,21 @@ const Gallery = ({
         // Use offset-based paginated fetch
         const offset = reset ? 0 : cloudOffset;
         const result = await fetchCloudGalleryPage(offset, 20);
+        loadedThreads = result.threads || [];
         if (reset) {
-          setCloudThreads(result.threads || []);
-          setCloudOffset(result.threads?.length || 0);
+          setCloudThreads(loadedThreads);
+          setCloudOffset(loadedThreads.length);
         } else {
-          setCloudThreads(prev => [...prev, ...(result.threads || [])]);
-          setCloudOffset(offset + (result.threads?.length || 0));
+          setCloudThreads(prev => [...prev, ...loadedThreads]);
+          setCloudOffset(offset + loadedThreads.length);
         }
         setHasMoreCloud(result.hasMore || false);
       }
 
-      // Notify parent with cloud thread IDs so it can detect stale local publications
-      if (onCloudGalleryLoaded && cloudThreads) {
-        const cloudIds = cloudThreads.map(t => t.id).filter(Boolean);
-        onCloudGalleryLoaded(cloudIds);
+      // Notify parent with cloud threads so it can detect sync status
+      // Pass full thread data to allow turn count comparison
+      if (onCloudGalleryLoaded && loadedThreads.length > 0) {
+        onCloudGalleryLoaded(loadedThreads.map(t => ({ id: t.id, turnCount: t.turnCount })));
       }
     } catch (err) {
       console.error('Cloud gallery load error:', err);
