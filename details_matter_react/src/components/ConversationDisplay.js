@@ -17,8 +17,9 @@ const ConversationDisplay = ({
   forkTurn // Turn index where this thread was forked from
 }) => {
   const [guidance, setGuidance] = useState('');
+  const [dismissedApiWarning, setDismissedApiWarning] = useState(false);
   const forkPointRef = useRef(null);
-  const hasScrolledRef = useRef(false);
+  const hasScrolledRef = useRef(null);
 
   // Auto-scroll to fork point or first new turn when conversation loads (only once)
   useEffect(() => {
@@ -31,7 +32,7 @@ const ConversationDisplay = ({
         const scrollTarget = document.getElementById(`turn-${scrollTargetIdx}`) || forkPointRef.current;
 
         if (scrollTarget) {
-          scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
           hasScrolledRef.current = true;
         }
       }, 300);
@@ -97,71 +98,68 @@ const ConversationDisplay = ({
       {/* Floating Action Bar */}
       {conversation.length > 0 && (
         <div className="floating-action-bar-container">
-          {/* API Key Warning */}
-          {!isApiKeySet && (
-            <div className="api-key-warning" style={{
-              background: 'linear-gradient(to right, #6d2020, #4a1515)',
-              border: '1px solid #8b3030',
-              borderRadius: '8px',
-              padding: '12px 16px',
-              marginBottom: '12px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              color: '#ffcccc',
-              fontFamily: "'Cinzel', serif",
-              fontSize: '0.9rem'
-            }}>
-              <span style={{ fontSize: '1.2rem' }}>🔑</span>
-              <span>API Key not set. Open <strong>⚙️ Settings</strong> to add your Gemini API key.</span>
-            </div>
-          )}
-          <div className="floating-action-bar">
-            {/* Input - Grow to fill space */}
-            <input
-              type="text"
-              className="floating-action-bar__input"
-              placeholder="🎬 Steer the story... (optional)"
-              value={guidance}
-              onChange={(e) => setGuidance(e.target.value)}
-              disabled={isLoading}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !isLoading && isApiKeySet) {
-                  handleContinue();
-                }
-              }}
-            />
-
-            {/* Info & Controls Group */}
-            <div className="floating-action-bar__controls">
-              <span className="floating-action-bar__turn-info">
-                Turn {currentTurn}
-              </span>
-
-              <div className="floating-action-bar__style-selector">
-                <select
-                  value={style}
-                  onChange={(e) => onStyleChange && onStyleChange(e.target.value)}
-                  disabled={isLoading}
-                  title="Change Art Style"
+          <div className="floating-action-bar-wrapper">
+            {/* API Key Warning - dismissible, positioned above bar */}
+            {!isApiKeySet && !dismissedApiWarning && (
+              <div className="api-key-warning">
+                <span className="api-key-warning__icon">🔑</span>
+                <span className="api-key-warning__text">API Key not set. Open <strong>⚙️ Settings</strong>.</span>
+                <button
+                  className="api-key-warning__close"
+                  onClick={() => setDismissedApiWarning(true)}
+                  aria-label="Dismiss"
                 >
-                  {STYLES.map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
+                  ✕
+                </button>
               </div>
+            )}
+            <div className="floating-action-bar">
+              {/* Input - Grow to fill space */}
+              <input
+                type="text"
+                className="floating-action-bar__input"
+                placeholder="🎬 Steer the story... (optional)"
+                value={guidance}
+                onChange={(e) => setGuidance(e.target.value)}
+                disabled={isLoading}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !isLoading && isApiKeySet) {
+                    handleContinue();
+                  }
+                }}
+              />
 
-              <button
-                className="primary-button compact"
-                onClick={handleContinue}
-                disabled={!isApiKeySet || isLoading}
-              >
-                {isLoading ? (
-                  <span className="spinner small"></span>
-                ) : (
-                  guidance ? '🎬 Run' : '➡️ Next'
-                )}
-              </button>
+              {/* Info & Controls Group */}
+              <div className="floating-action-bar__controls">
+                <span className="floating-action-bar__turn-info">
+                  Turn {currentTurn}
+                </span>
+
+                <div className="floating-action-bar__style-selector">
+                  <select
+                    value={style}
+                    onChange={(e) => onStyleChange && onStyleChange(e.target.value)}
+                    disabled={isLoading}
+                    title="Change Art Style"
+                  >
+                    {STYLES.map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  className="primary-button compact"
+                  onClick={handleContinue}
+                  disabled={!isApiKeySet || isLoading}
+                >
+                  {isLoading ? (
+                    <span className="spinner small"></span>
+                  ) : (
+                    guidance ? '🎬 Run' : '➡️ Next'
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -169,6 +167,5 @@ const ConversationDisplay = ({
     </div>
   );
 };
-
 
 export default ConversationDisplay;

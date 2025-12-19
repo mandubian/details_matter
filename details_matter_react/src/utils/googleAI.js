@@ -235,10 +235,6 @@ export const generateContent = async (prompt, context = "", previousImage = null
     // Check for IMAGE_OTHER finishReason (API declined to generate image)
     const finishReason = candidate?.finishReason;
     const finishMessage = candidate?.finishMessage;
-    if (finishReason === 'IMAGE_OTHER') {
-      console.warn('Image generation declined by API:', finishReason, finishMessage);
-      // Continue to try fallback, but log the issue
-    }
 
     let text = response?.text || null; // SDK helper
     if (!text && candidates.length > 0) {
@@ -256,38 +252,21 @@ export const generateContent = async (prompt, context = "", previousImage = null
       }
     }
 
-    // If no image was found, try fallback generation
-    if (!image) {
-      try {
-        // If we got IMAGE_OTHER, try with a simpler prompt
-        const fallbackPrompt = text || 'Generate a creative artistic image';
-        console.log('No image in initial response (finishReason:', finishReason, '), attempting fallback with simplified prompt...');
-
-        const imageOnlyContents = [{ role: 'user', parts: [{ text: `Create an image: ${fallbackPrompt}` }] }];
-        const imageOnlyResponse = await performGenerateCall(model, imageOnlyContents);
-
-        const imageCandidates = imageOnlyResponse?.candidates || imageOnlyResponse?.response?.candidates || [];
-        const imageCandidate = imageCandidates?.[0];
-        const imageParts = imageCandidate?.content?.parts || [];
-
-        // Check if fallback also got rejected
-        if (imageCandidate?.finishReason === 'IMAGE_OTHER') {
-          console.warn('Fallback also rejected:', imageCandidate?.finishMessage);
-        }
-
-        for (const part of imageParts) {
-          if (part?.inlineData?.data && part?.inlineData?.mimeType) {
-            image = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-            console.log('Fallback image generation succeeded');
-            break;
-          }
-        }
-      } catch (fallbackError) {
-        console.error('Fallback image generation failed:', fallbackError);
-      }
+    // Handle IMAGE_OTHER - API declined to generate image
+    // Don't fallback, just return with clear error message for user to handle
+    if (finishReason === 'IMAGE_OTHER' || (!image && finishReason)) {
+      console.warn('Image generation declined by API:', finishReason, finishMessage);
+      return {
+        text,
+        image: null,
+        metrics: { requestBytes, imageDecodedBytes },
+        finishReason,
+        finishMessage,
+        error: finishMessage || 'The model couldn\'t generate an image for this content. Try steering the story differently, or try again later.'
+      };
     }
 
-    // Return result with finishReason for debugging
+    // Return successful result
     return {
       text,
       image,

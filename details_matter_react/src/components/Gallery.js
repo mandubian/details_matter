@@ -1,6 +1,8 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { fetchCloudGallery, getWorkerUrl, setWorkerUrl } from '../services/cloudService';
+import { fetchCloudGalleryPage, searchCloudGallery, getWorkerUrl, setWorkerUrl } from '../services/cloudService';
 import GenealogyTree from './GenealogyTree';
+import LandingHero from './LandingHero';
+import HelpPage from './HelpPage';
 
 const Gallery = ({
   localGallery,
@@ -11,8 +13,11 @@ const Gallery = ({
   onForkThread,
   onDeleteThread,
   onUploadToCloud,
+  onCloudGalleryLoaded, // Callback with cloud thread IDs to detect stale publications
+  onOpenSettings,
+  isRemote
 }) => {
-  const [activeTab, setActiveTab] = useState('local'); // 'local' or 'cloud'
+  const [activeTab, setActiveTab] = useState('cloud'); // 'local' or 'cloud' as default
   const [browseMode, setBrowseMode] = useState('wall'); // 'wall' | 'tree'
   // eslint-disable-next-line no-unused-vars
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -25,7 +30,51 @@ const Gallery = ({
   const [isConfiguring] = useState(!getWorkerUrl());
   const [treePan, setTreePan] = useState({ x: 0, y: 0 });
   const [treeZoom, setTreeZoom] = useState(1);
-  const [genealogyThreadId, setGenealogyThreadId] = useState(null);
+  const [genealogyThreadId, setGenealogyThreadId] = useState(() => {
+    const match = window.location.hash.match(/^#\/lineage\/(.+)$/);
+    return match ? match[1] : null;
+  });
+  const [hasEnteredExhibition, setHasEnteredExhibition] = useState(() => {
+    return window.location.hash === '#/gallery' || window.location.hash.startsWith('#/lineage/');
+  });
+
+  // Search and pagination state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [cloudOffset, setCloudOffset] = useState(0);
+  const [hasMoreCloud, setHasMoreCloud] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimeoutRef = useRef(null);
+
+  // Help page state
+  const [showHelp, setShowHelp] = useState(false);
+
+  // Sync state with hash changes
+  useEffect(() => {
+    const handleHash = () => {
+      const hash = window.location.hash;
+      if (hash === '#/gallery') {
+        setHasEnteredExhibition(true);
+        setGenealogyThreadId(null);
+      } else if (hash === '#/') {
+        // Optional: allow reset if they explicitly go to root?
+      } else {
+        const linMatch = hash.match(/^#\/lineage\/(.+)$/);
+        if (linMatch) {
+          setGenealogyThreadId(linMatch[1]);
+          setHasEnteredExhibition(true);
+        }
+      }
+    };
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, []);
+
+  // Reset scroll position when gallery mounts
+  useEffect(() => {
+    if (!hasEnteredExhibition) {
+      window.scrollTo(0, 0);
+    }
+  }, [hasEnteredExhibition]);
 
   useEffect(() => {
     if (activeTab === 'cloud' && !isConfiguring && getWorkerUrl()) {
@@ -33,11 +82,63 @@ const Gallery = ({
     }
   }, [activeTab, isConfiguring]);
 
-  const loadCloudGallery = async () => {
+  const loadCloudGallery = async (reset = true) => {
     setLoadingCloud(true);
-    const threads = await fetchCloudGallery();
-    setCloudThreads(threads);
+    try {
+      if (searchQuery.trim()) {
+        // Use search endpoint
+        setIsSearching(true);
+        const result = await searchCloudGallery(searchQuery, null, 20);
+        setCloudThreads(result.threads || []);
+        setHasMoreCloud(false); // Search doesn't support pagination yet
+        setCloudOffset(0);
+        setIsSearching(false);
+      } else {
+        // Use offset-based paginated fetch
+        const offset = reset ? 0 : cloudOffset;
+        const result = await fetchCloudGalleryPage(offset, 20);
+        if (reset) {
+          setCloudThreads(result.threads || []);
+          setCloudOffset(result.threads?.length || 0);
+        } else {
+          setCloudThreads(prev => [...prev, ...(result.threads || [])]);
+          setCloudOffset(offset + (result.threads?.length || 0));
+        }
+        setHasMoreCloud(result.hasMore || false);
+      }
+
+      // Notify parent with cloud thread IDs so it can detect stale local publications
+      if (onCloudGalleryLoaded && cloudThreads) {
+        const cloudIds = cloudThreads.map(t => t.id).filter(Boolean);
+        onCloudGalleryLoaded(cloudIds);
+      }
+    } catch (err) {
+      console.error('Cloud gallery load error:', err);
+    }
     setLoadingCloud(false);
+  };
+
+  // Debounced search effect
+  useEffect(() => {
+    if (activeTab !== 'cloud') return;
+
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    searchTimeoutRef.current = setTimeout(() => {
+      loadCloudGallery(true);
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    };
+  }, [searchQuery]);
+
+  const loadMoreCloud = () => {
+    if (!loadingCloud && hasMoreCloud) {
+      loadCloudGallery(false);
+    }
   };
 
   // Wrapper for upload that refreshes cloud gallery after success
@@ -147,7 +248,7 @@ const Gallery = ({
   const threads = useMemo(() => activeTab === 'local' ? (localGallery || []) : (cloudThreads || []), [activeTab, localGallery, cloudThreads]);
 
   const normalizedThreads = useMemo(() => {
-    const out = (threads || []).map(t => {
+    let out = (threads || []).map(t => {
       // Normalize forkInfo from various possible structures
       let forkInfo = t.forkInfo || t.forkFrom || null;
 
@@ -167,6 +268,28 @@ const Gallery = ({
       };
     }).filter(t => !!t.id);
 
+    // Apply local search filter for local gallery
+    if (activeTab === 'local' && searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      out = out.filter(t => {
+        // Search in title
+        const title = t.title || t.conversation?.[0]?.text || '';
+        if (title.toLowerCase().includes(query)) return true;
+
+        // Search in conversation texts
+        if (t.conversation) {
+          for (const turn of t.conversation) {
+            if (turn.text?.toLowerCase().includes(query)) return true;
+          }
+        }
+
+        // Search in style
+        if (t.style?.toLowerCase().includes(query)) return true;
+
+        return false;
+      });
+    }
+
     // Sort by timestamp descending (newest first) for wall view
     out.sort((a, b) => {
       const at = a?.timestamp ? new Date(a.timestamp).getTime() : 0;
@@ -175,7 +298,7 @@ const Gallery = ({
     });
 
     return out;
-  }, [threads]);
+  }, [threads, activeTab, searchQuery]);
 
   // Build a simple parent->children tree using forkInfo.parentId
   const tree = useMemo(() => {
@@ -236,6 +359,15 @@ const Gallery = ({
 
   // State for two-click delete confirmation
   const [pendingDeleteId, setPendingDeleteId] = useState(null);
+
+  const exploreExhibition = () => {
+    setHasEnteredExhibition(true);
+    window.location.hash = '#/gallery';
+    const grid = document.querySelector('.rpg-grid') || document.querySelector('.rpg-main');
+    if (grid) {
+      grid.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   // Auto-reset pending delete after 3 seconds
   useEffect(() => {
@@ -386,13 +518,46 @@ const Gallery = ({
           </div>
         )}
 
+        {/* RIGHT RIBBON - Publication status for local threads */}
+        {!isCloud && thread?.publishedAt && !thread?.forkInfo?.isParentCloud && (
+          <div
+            title="Published to the Grand Exhibition"
+            style={{
+              position: 'absolute',
+              top: '6px',
+              right: '4px',
+              background: 'linear-gradient(to left, #f2e1c9, #e8d0ae)',
+              padding: '2px 8px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              fontSize: '8px',
+              fontWeight: 800,
+              color: '#3d2b1f',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+              border: '1.5px solid #a67c52',
+              borderRadius: '2px',
+              fontFamily: "'Cinzel', serif",
+              letterSpacing: '0.5px',
+              textTransform: 'uppercase',
+              zIndex: 60,
+              clipPath: 'polygon(5% 0%, 100% 0%, 100% 100%, 5% 100%, 0% 50%)'
+            }}
+          >
+            🏛️ Published
+          </div>
+        )}
+
 
 
         <div className="rpg-card__frame">
           {/* Only clicking the image opens the thread */}
           <div
             className="rpg-card__imageContainer"
-            onClick={() => onOpenThread(thread, isCloud)}
+            onClick={() => {
+              setHasEnteredExhibition(true);
+              onOpenThread(thread, isCloud);
+            }}
             style={{ cursor: 'pointer' }}
           >
             {images[0] ? (
@@ -488,54 +653,190 @@ const Gallery = ({
     );
   };
 
+  const [showHeader, setShowHeader] = useState(false);
+  const mainRef = useRef(null);
+
+  // Reset scroll and header when gallery mounts or tab changes
+  useEffect(() => {
+    if (mainRef.current) {
+      if (!hasEnteredExhibition) {
+        mainRef.current.scrollTo(0, 0);
+      }
+    }
+    setShowHeader(!(browseMode === 'wall' && !genealogyThreadId && !hasEnteredExhibition));
+  }, [activeTab, browseMode, genealogyThreadId, hasEnteredExhibition]);
+
+  const handleScroll = useCallback(() => {
+    if (!mainRef.current) return;
+
+    // If LandingHero is not active, always show header
+    const isHeroActive = browseMode === 'wall' && !genealogyThreadId && !hasEnteredExhibition;
+    if (!isHeroActive) {
+      if (!showHeader) setShowHeader(true);
+      return;
+    }
+
+    // Toggle header based on scroll threshold (e.g., 300px)
+    const scrollTop = mainRef.current.scrollTop;
+    if (scrollTop > 300) {
+      if (!showHeader) setShowHeader(true);
+      if (!hasEnteredExhibition) {
+        setHasEnteredExhibition(true);
+        // Replace instead of push to avoid history clutter when scrolling
+        window.location.replace('#/gallery');
+      }
+    } else if (scrollTop <= 300 && showHeader) {
+      setShowHeader(false);
+    }
+  }, [browseMode, genealogyThreadId, showHeader, hasEnteredExhibition]);
+
   return (
     <div className="rpg-layout">
-      {/* BACKGROUND DECORATIONS handled in CSS on body or layout */}
-
-      {/* HEADER */}
+      {/* Header is always shown for consistent access to Settings and Tabs */}
       <header className="rpg-header">
-        <h1 className="rpg-main-title">Thread Gallery</h1>
+        <h1 className="rpg-main-title">Only Details Matter</h1>
 
         <div className="rpg-header__controls">
           <div className="rpg-toggle-group">
             <button
               className={`rpg-jewel-btn red ${activeTab === 'local' ? 'active' : ''}`}
-              onClick={() => setActiveTab('local')}
+              onClick={() => {
+                setActiveTab('local');
+                setHasEnteredExhibition(true);
+              }}
             >
               Local
             </button>
             <button
               className={`rpg-jewel-btn blue ${activeTab === 'cloud' ? 'active' : ''}`}
-              onClick={() => setActiveTab('cloud')}
+              onClick={() => {
+                setActiveTab('cloud');
+                setHasEnteredExhibition(true);
+              }}
             >
               Published
             </button>
           </div>
 
+
           <button className="rpg-scroll-btn" onClick={onNewThread} disabled={isLoading}>
             <span className="rpg-scroll-text">New Thread</span>
+          </button>
+
+          <button className="rpg-help-btn" onClick={() => setShowHelp(true)} title="Help & About">
+            ?
           </button>
         </div>
       </header>
 
       {/* MAIN LIST */}
-      <main className="rpg-main">
-        {activeTab === 'cloud' && (
+      <main className="rpg-main" ref={mainRef} onScroll={handleScroll}>
+        {browseMode === 'wall' && !genealogyThreadId && !hasEnteredExhibition && (
+          <LandingHero
+            onBeginEvolution={() => {
+              setHasEnteredExhibition(true);
+              onNewThread();
+            }}
+            onExploreExhibition={exploreExhibition}
+          />
+        )}
+
+        {/* Search Panel - visible for both tabs when exhibition is entered */}
+        {hasEnteredExhibition && (
           <div className="rpg-notice-panel">
-            <div style={{ textAlign: 'center', marginBottom: 10 }}>
-              <button className="rpg-btn-text" onClick={loadCloudGallery}>🔄 Refresh Cloud Gallery</button>
+            <div style={{
+              display: 'flex',
+              gap: '10px',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: '10px'
+            }}>
+              <input
+                type="text"
+                className="rpg-search-input"
+                placeholder={`🔍 Search ${activeTab === 'local' ? 'local' : 'published'} threads...`}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  flex: 1,
+                  maxWidth: '400px',
+                  padding: '10px 15px',
+                  borderRadius: '20px',
+                  border: '1px solid var(--gold-dark)',
+                  background: 'rgba(0,0,0,0.3)',
+                  color: 'var(--text-primary)',
+                  fontSize: '0.95rem',
+                  fontFamily: "'Lato', sans-serif"
+                }}
+              />
+              {searchQuery && (
+                <button
+                  className="rpg-btn-text"
+                  onClick={() => setSearchQuery('')}
+                  style={{ padding: '5px 10px' }}
+                >
+                  ✕ Clear
+                </button>
+              )}
+              {activeTab === 'cloud' && (
+                <button
+                  className="rpg-btn-text"
+                  onClick={() => loadCloudGallery(true)}
+                  disabled={loadingCloud}
+                >
+                  🔄 {loadingCloud ? 'Loading...' : 'Refresh'}
+                </button>
+              )}
             </div>
+            {/* Search status messages */}
+            {activeTab === 'cloud' && isSearching && (
+              <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                Searching...
+              </div>
+            )}
+            {searchQuery && normalizedThreads.length > 0 && (
+              <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                Found {normalizedThreads.length} thread{normalizedThreads.length !== 1 ? 's' : ''} matching "{searchQuery}"
+              </div>
+            )}
+            {searchQuery && normalizedThreads.length === 0 && !isSearching && (
+              <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                No threads found matching "{searchQuery}"
+              </div>
+            )}
           </div>
         )}
+
 
         {browseMode === 'wall' && !genealogyThreadId && (
           <div className="rpg-grid">
             {normalizedThreads.map(t => (
               <RPGThreadCard key={t.id} thread={t} isCloud={activeTab === 'cloud'} />
             ))}
-            {normalizedThreads.length === 0 && (
+            {normalizedThreads.length === 0 && hasEnteredExhibition && (
               <div className="rpg-empty">No scrolls found in the archives.</div>
             )}
+          </div>
+        )}
+
+        {/* Load More button for cloud gallery */}
+        {activeTab === 'cloud' && hasEnteredExhibition && hasMoreCloud && !searchQuery && (
+          <div style={{
+            display: 'flex',
+            justifyContent: 'center',
+            padding: '20px',
+            marginBottom: '40px'
+          }}>
+            <button
+              className="rpg-scroll-btn"
+              onClick={loadMoreCloud}
+              disabled={loadingCloud}
+              style={{ opacity: loadingCloud ? 0.6 : 1 }}
+            >
+              <span className="rpg-scroll-text">
+                {loadingCloud ? '⏳ Loading...' : '📜 Load More'}
+              </span>
+            </button>
           </div>
         )}
 
@@ -547,8 +848,14 @@ const Gallery = ({
                 getPreviewImages={getPreviewImages}
                 isCloud={activeTab === 'cloud'}
                 isLoading={isLoading}
-                onOpenThread={onOpenThread}
-                onForkThread={onForkThread}
+                onOpenThread={(t, isC) => {
+                  setHasEnteredExhibition(true);
+                  onOpenThread(t, isC);
+                }}
+                onForkThread={(t) => {
+                  setHasEnteredExhibition(true);
+                  onForkThread(t);
+                }}
                 pan={treePan}
                 setPan={setTreePan}
                 zoom={treeZoom}
@@ -564,34 +871,24 @@ const Gallery = ({
             selectedThreadId={genealogyThreadId}
             tree={tree}
             getPreviewImages={getPreviewImages}
-            onSelectThread={setGenealogyThreadId}
-            onOpenThread={(t) => onOpenThread(t, t.isRemote || activeTab === 'cloud')}
-            onBack={() => setGenealogyThreadId(null)}
+            onSelectThread={(id) => {
+              setHasEnteredExhibition(true);
+              setGenealogyThreadId(id);
+            }}
+            onOpenThread={(t) => {
+              setHasEnteredExhibition(true);
+              onOpenThread(t, t.isRemote || activeTab === 'cloud');
+            }}
+            onBack={() => {
+              setGenealogyThreadId(null);
+              window.location.hash = '#/gallery';
+            }}
           />
         )}
       </main>
 
-      {/* BOTTOM NAV */}
-      <nav className="rpg-nav-bar">
-        <button className="rpg-nav-item active">
-          <span className="rpg-icon">🏠</span>
-        </button>
-        <button className="rpg-nav-item">
-          <span className="rpg-icon">🔍</span>
-        </button>
-        {/* Toggle View Mode via Nav item */}
-        <button
-          className={`rpg-nav-center ${browseMode === 'tree' ? 'active' : ''}`}
-          onClick={() => setBrowseMode(browseMode === 'wall' ? 'tree' : 'wall')}
-        >
-          <span className="rpg-icon-large">Wait</span> {/* Will execute logic, maybe icon is Y-shape */}
-          <span className="rpg-icon-large">{browseMode === 'wall' ? '🌿' : '🖼️'}</span>
-        </button>
-        <button className="rpg-nav-item">
-          <span className="rpg-icon">👤</span>
-        </button>
-      </nav>
-
+      {/* Help Page Modal */}
+      {showHelp && <HelpPage onClose={() => setShowHelp(false)} />}
     </div>
   );
 };

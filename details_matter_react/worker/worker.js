@@ -4,6 +4,7 @@
  * Setup:
  * 1. Create a KV Namespace named "GALLERY_KV" and bind it to this worker. (For metadata index)
  * 2. Create an R2 Bucket named "GALLERY_BUCKET" and bind it to this worker. (For full thread data)
+ * 3. Set ADMIN_SECRET via: wrangler secret put ADMIN_SECRET
  *
  * Example wrangler.toml:
  * [[kv_namespaces]]
@@ -34,6 +35,40 @@ function base64ToArrayBuffer(base64) {
   return bytes.buffer;
 }
 
+// Helper to generate searchText from thread data
+function generateSearchText(threadData) {
+  let texts = [];
+
+  // Add title from first turn
+  if (threadData.conversation?.[0]?.text) {
+    texts.push(threadData.conversation[0].text.slice(0, 200));
+  }
+
+  // Add all turn texts (truncated)
+  if (threadData.conversation) {
+    for (const turn of threadData.conversation) {
+      if (turn.text) {
+        texts.push(turn.text.slice(0, 100));
+      }
+    }
+  }
+
+  // Join and limit total length
+  return texts.join(' ').slice(0, 1000).toLowerCase();
+}
+
+// Helper to extract all unique styles from a thread
+function extractStyles(threadData) {
+  const styles = new Set();
+  if (threadData.style) styles.add(threadData.style);
+  if (threadData.conversation) {
+    for (const turn of threadData.conversation) {
+      if (turn.style) styles.add(turn.style);
+    }
+  }
+  return Array.from(styles);
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -42,12 +77,110 @@ export default {
     // CORS headers
     const corsHeaders = {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, PUT, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Methods': 'GET, PUT, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, X-Admin-Token',
     };
 
     if (method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders });
+    }
+
+    // POST /admin/migrate - One-time migration to enhance metadata with searchText
+    if (method === 'POST' && url.pathname === '/admin/migrate') {
+      // Check admin secret
+      const adminToken = request.headers.get('X-Admin-Token');
+      if (!env.ADMIN_SECRET || adminToken !== env.ADMIN_SECRET) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+
+      // Check if already migrated
+      const migrationKey = 'migration:v1:searchtext';
+      const alreadyMigrated = await env.GALLERY_KV.get(migrationKey);
+      if (alreadyMigrated) {
+        return new Response(JSON.stringify({
+          message: 'Migration already completed',
+          migratedAt: alreadyMigrated
+        }), {
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+
+      try {
+        // List all metadata keys
+        let cursor = null;
+        let migratedCount = 0;
+        let errorCount = 0;
+
+        do {
+          const listResult = await env.GALLERY_KV.list({
+            prefix: 'meta:',
+            cursor: cursor
+          });
+
+          for (const key of listResult.keys) {
+            try {
+              // Get current metadata
+              const metaStr = await env.GALLERY_KV.get(key.name);
+              if (!metaStr) continue;
+              const metadata = JSON.parse(metaStr);
+
+              // Skip if already has searchText
+              if (metadata.searchText) {
+                migratedCount++;
+                continue;
+              }
+
+              // Fetch full thread from R2
+              const threadObj = await env.GALLERY_BUCKET.get(`thread-${metadata.id}.json`);
+              if (!threadObj) {
+                errorCount++;
+                continue;
+              }
+
+              const threadData = JSON.parse(await threadObj.text());
+
+              // Generate searchText and styles
+              const searchText = generateSearchText(threadData);
+              const styles = extractStyles(threadData);
+
+              // Update metadata
+              const enhancedMetadata = {
+                ...metadata,
+                searchText,
+                styles
+              };
+
+              // Save back to KV
+              await env.GALLERY_KV.put(key.name, JSON.stringify(enhancedMetadata));
+              migratedCount++;
+            } catch (e) {
+              console.error(`Failed to migrate ${key.name}:`, e);
+              errorCount++;
+            }
+          }
+
+          cursor = listResult.cursor;
+        } while (cursor);
+
+        // Mark migration as complete
+        await env.GALLERY_KV.put(migrationKey, new Date().toISOString());
+
+        return new Response(JSON.stringify({
+          success: true,
+          migratedCount,
+          errorCount
+        }), {
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
     }
 
     // PUT /upload - Upload a thread
@@ -98,6 +231,10 @@ export default {
           }
         }
 
+        // Generate searchText and styles for the new thread
+        const searchText = generateSearchText(data);
+        const styles = extractStyles(data);
+
         // Metadata for the gallery list (exclude heavy conversation data)
         const metadata = {
           id: threadId,
@@ -108,7 +245,10 @@ export default {
           model: data.model,
           forkInfo: data.forkInfo,
           // Store first image thumbnail if available
-          thumbnail: data.thumbnail || data.conversation.find(t => t.image)?.image || null
+          thumbnail: data.thumbnail || data.conversation.find(t => t.image)?.image || null,
+          // New: searchable text and styles
+          searchText,
+          styles
         };
 
         // Store full thread in R2 (now lightweight)
@@ -150,22 +290,112 @@ export default {
       }
     }
 
-    // GET /gallery - List threads (from KV metadata index)
+    // GET /gallery - List threads with pagination
+    // Params: offset (optional, default 0), limit (optional, default 20, max 50)
+    // Note: We fetch ALL metadata from KV (lightweight), sort by timestamp, then paginate
+    // This is necessary because KV list order is undefined and doesn't match timestamp order
     if (method === 'GET' && url.pathname === '/gallery') {
       try {
-        // List keys starting with 'meta:'
-        const list = await env.GALLERY_KV.list({ prefix: 'meta:' });
-        const threads = [];
+        const offsetParam = parseInt(url.searchParams.get('offset') || '0', 10);
+        const limitParam = parseInt(url.searchParams.get('limit') || '20', 10);
+        const offset = Math.max(offsetParam, 0);
+        const limit = Math.min(Math.max(limitParam, 1), 50); // Clamp between 1-50
 
-        for (const key of list.keys) {
-          const metaStr = await env.GALLERY_KV.get(key.name);
-          if (metaStr) threads.push(JSON.parse(metaStr));
-        }
+        // Fetch ALL metadata keys (metadata is small, this is efficient)
+        let allThreads = [];
+        let cursor = null;
+
+        do {
+          const listResult = await env.GALLERY_KV.list({
+            prefix: 'meta:',
+            cursor
+          });
+
+          for (const key of listResult.keys) {
+            const metaStr = await env.GALLERY_KV.get(key.name);
+            if (metaStr) allThreads.push(JSON.parse(metaStr));
+          }
+
+          cursor = listResult.cursor;
+        } while (cursor);
+
+        // Sort ALL threads by timestamp desc (newest first)
+        allThreads.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        // Apply offset/limit pagination
+        const paginatedThreads = allThreads.slice(offset, offset + limit);
+        const hasMore = offset + limit < allThreads.length;
+
+        return new Response(JSON.stringify({
+          threads: paginatedThreads,
+          offset: offset,
+          limit: limit,
+          total: allThreads.length,
+          hasMore
+        }), {
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
+      }
+    }
+
+    // GET /gallery/search - Search threads
+    // Params: q (search query), style (filter), cursor, limit
+    if (method === 'GET' && url.pathname === '/gallery/search') {
+      try {
+        const query = (url.searchParams.get('q') || '').toLowerCase().trim();
+        const styleFilter = url.searchParams.get('style') || null;
+        const limitParam = parseInt(url.searchParams.get('limit') || '20', 10);
+        const limit = Math.min(Math.max(limitParam, 1), 50);
+
+        // For search, we need to scan all metadata (KV doesn't support text search)
+        // This is a limitation - for large datasets, we'd need a search index
+        let cursor = null;
+        const matchingThreads = [];
+
+        do {
+          const listResult = await env.GALLERY_KV.list({
+            prefix: 'meta:',
+            cursor
+          });
+
+          for (const key of listResult.keys) {
+            const metaStr = await env.GALLERY_KV.get(key.name);
+            if (!metaStr) continue;
+
+            const metadata = JSON.parse(metaStr);
+
+            // Check style filter
+            if (styleFilter && !metadata.styles?.includes(styleFilter)) {
+              continue;
+            }
+
+            // Check query match
+            if (query) {
+              const titleMatch = metadata.title?.toLowerCase().includes(query);
+              const searchMatch = metadata.searchText?.includes(query);
+              if (!titleMatch && !searchMatch) continue;
+            }
+
+            matchingThreads.push(metadata);
+
+            // Stop early if we have enough results
+            if (matchingThreads.length >= limit) break;
+          }
+
+          cursor = listResult.cursor;
+        } while (cursor && matchingThreads.length < limit);
 
         // Sort by timestamp desc
-        threads.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        matchingThreads.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
-        return new Response(JSON.stringify(threads), {
+        return new Response(JSON.stringify({
+          threads: matchingThreads.slice(0, limit),
+          query,
+          styleFilter,
+          count: matchingThreads.length
+        }), {
           headers: { 'Content-Type': 'application/json', ...corsHeaders }
         });
       } catch (err) {
@@ -196,8 +426,3 @@ export default {
     return new Response('Not Found', { status: 404, headers: corsHeaders });
   }
 };
-
-
-
-
-

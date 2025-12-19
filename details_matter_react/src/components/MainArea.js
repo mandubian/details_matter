@@ -23,7 +23,11 @@ const MainArea = ({
   onStyleChange,
   isRemote,
   onForkThread,
-  onUploadThread
+  onUploadThread,
+  onOpenGallery,  // For mobile back navigation
+  onOpenSettings, // For mobile settings access
+  isSynced,       // Whether thread is already synced to cloud
+  hasNewChanges   // Whether there are unsaved changes since last publish
 }) => {
   const [initialPrompt, setInitialPrompt] = useState('');
   const isCloud = isRemote; // Alias for cloud status check
@@ -141,7 +145,8 @@ const MainArea = ({
       // First generation
       if (previousImageFile) {
         // If user provided an image, use the detail-focused prompt to start the evolution
-        const basePrompt = "Based on the provided image, select one important detail for you independently of the rest of the image (e.g., a specific object, character, or element). Describe your choice in text and then create a new story, situation, anecdote or other idea in which that detail is preserved as a detail, not necessarily the main subject of the image. Then, generate a new image from your description, while keeping only this detail recognizable.";
+        const basePrompt = `Look at this image carefully. Pick ONE small detail that catches your eye (like an object, texture, color, or shape). Briefly describe what you chose.
+Then imagine a completely NEW scene where this detail appears somewhere in the background or as a minor element - not the main focus. Create an image of this new scene.`;
 
         // Incorporate user guidance if provided
         if (initialPromptText && initialPromptText.trim()) {
@@ -166,7 +171,9 @@ const MainArea = ({
       }
     } else {
       // Subsequent turns: evolve from previous image
-      const basePrompt = "Based on the previous image, select one important detail for you independently of the rest of the image (e.g., a specific object, character, or element). Describe your choice in text and then create a new story, situation, anecdote or other idea in which that detail is preserved as a detail, not necessarily the main subject of the image. Then, generate a new image from your description, while keeping only this detail recognizable.";
+      const basePrompt = `Examine this image. Find ONE interesting detail (an object, pattern, or element).
+Write a short description of your choice.
+Now create a fresh image showing a different scene or moment, where this detail appears subtly somewhere in the composition. Make it feel like a natural part of the new scene.`;
 
       // Incorporate user guidance if provided
       if (initialPromptText && initialPromptText.trim()) {
@@ -292,8 +299,9 @@ const MainArea = ({
 
   return (
     <div className="main-area">
+
       {(isCloud || forkInfo?.isParentCloud) ? (
-        <div style={{
+        <div className="thread-ribbon thread-ribbon--cloud" style={{
           margin: '18px 18px 0 18px',
           padding: '12px 20px',
           borderRadius: '4px',
@@ -334,21 +342,23 @@ const MainArea = ({
           )}
         </div>
       ) : (
-        <div style={{
-          margin: '18px 18px 0 18px',
+        <div className="thread-ribbon thread-ribbon--local" style={{
+          margin: '18px 0 0 0',
           padding: '10px 20px',
-          borderRadius: '4px',
+          borderRadius: '0',
           background: 'linear-gradient(to right, #e8ede3, #d4dbcd)',
-          border: '1.5px solid #8b9a7d',
+          border: 'none',
+          borderTop: '1.5px solid #8b9a7d',
+          borderBottom: '1.5px solid #8b9a7d',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
           gap: '12px',
           boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-          clipPath: 'polygon(1.5% 0%, 100% 0%, 98.5% 50%, 100% 100%, 1.5% 100%, 0% 50%)',
-          maxWidth: '100%',
+          width: '100%',
           overflow: 'hidden',
-          flexWrap: 'wrap'
+          flexWrap: 'wrap',
+          boxSizing: 'border-box'
         }}>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             {/* Art Nouveau style study/home icon */}
@@ -385,20 +395,40 @@ const MainArea = ({
             )}
 
             {!isCloud && onUploadThread && conversation.length >= 2 && (
-              <button
-                className="rpg-btn-small"
-                onClick={onUploadThread}
-                style={{
-                  padding: '6px 15px',
-                  background: 'linear-gradient(to bottom, #5c6a51, #3d4a35)',
-                  color: '#f0f7ed',
-                  border: '1px solid #8b9a7d',
-                  fontWeight: 800,
-                  fontSize: '0.65rem'
-                }}
-              >
-                🏛️ PUBLISH
-              </button>
+              isSynced && !hasNewChanges ? (
+                <span
+                  style={{
+                    padding: '6px 15px',
+                    background: 'linear-gradient(to bottom, #4a5d4a, #3d4a3d)',
+                    color: '#b0d4b0',
+                    border: '1px solid #6b8b6b',
+                    borderRadius: '4px',
+                    fontWeight: 800,
+                    fontSize: '0.65rem',
+                    fontFamily: "'Cinzel', serif"
+                  }}
+                >
+                  ✓ Synced
+                </span>
+              ) : (
+                <button
+                  className="rpg-btn-small"
+                  onClick={onUploadThread}
+                  style={{
+                    padding: '6px 15px',
+                    background: hasNewChanges
+                      ? 'linear-gradient(to bottom, #c4a35a, #8b6914)'
+                      : 'linear-gradient(to bottom, #5c6a51, #3d4a35)',
+                    color: '#f0f7ed',
+                    border: hasNewChanges ? '1px solid #daa520' : '1px solid #8b9a7d',
+                    fontWeight: 800,
+                    fontSize: '0.65rem'
+                  }}
+                  title={hasNewChanges ? 'Your local version has new changes - click to sync' : 'Publish to cloud'}
+                >
+                  {hasNewChanges ? '⚠️ Sync' : '🏛️ PUBLISH'}
+                </button>
+              )
             )}
           </div>
         </div>
@@ -450,6 +480,7 @@ const MainArea = ({
           isApiKeySet={isApiKeySet}
           isLoading={isLoading}
           style={style}
+          onStyleChange={onStyleChange}
         />
       ) : (
         <ConversationDisplay

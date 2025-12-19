@@ -28,7 +28,8 @@ const Sidebar = ({
   isCollapsed,
   onToggle,
   isRemote,
-  onForkCloud
+  onForkCloud,
+  isModal
 }) => {
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [overrideKeyInput, setOverrideKeyInput] = useState('');
@@ -158,15 +159,17 @@ const Sidebar = ({
 
   return (
     <div className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
-      <button
-        className="sidebar-toggle"
-        onClick={onToggle}
-        title={isCollapsed ? 'Expand Settings' : 'Collapse Settings'}
-      >
-        {isCollapsed ? '⚙️' : '◀ Hide'}
-      </button>
+      {!isModal && (
+        <button
+          className="sidebar-toggle"
+          onClick={onToggle}
+          title={isCollapsed ? 'Expand Settings' : 'Collapse Settings'}
+        >
+          {isCollapsed ? '⚙️' : '◀ Hide'}
+        </button>
+      )}
 
-      {!isCollapsed && <h2>⚙️ Settings</h2>}
+      {!isCollapsed && !isModal && <h2>⚙️ Settings</h2>}
 
       {!isCollapsed && (
         <>
@@ -261,17 +264,24 @@ const Sidebar = ({
                   className="danger-button"
                   onClick={onNewThread}
                   disabled={isLoading}
+                  title="Start a completely new thread (your current thread is auto-saved to gallery)"
                 >
-                  🧹 New Thread (Reset)
+                  🧹 New Thread
                 </button>
 
-                <button className="primary-button" onClick={onOpenGallery} disabled={isLoading}>
-                  📂 Enter the Gallery
-                </button>
-
-                <button className="secondary-button" onClick={onAddToGallery} disabled={isLoading}>
-                  {isRemote ? '📥 Clone to Local Gallery' : '💾 Save to Local Gallery'}
-                </button>
+                {conversation.length > 0 && (
+                  <button
+                    className="secondary-button"
+                    onClick={() => {
+                      const event = new CustomEvent('undoLastTurn');
+                      window.dispatchEvent(event);
+                    }}
+                    disabled={conversation.length === 0 || isLoading}
+                    title="Remove the last turn from the thread"
+                  >
+                    ↩️ Undo Last Turn
+                  </button>
+                )}
 
                 {isRemote && (
                   <button
@@ -279,6 +289,7 @@ const Sidebar = ({
                     onClick={onForkCloud}
                     disabled={isLoading}
                     style={{ background: 'var(--accent-color)' }}
+                    title="Create your own copy of this published thread to edit"
                   >
                     🌱 Fork this Thread
                   </button>
@@ -418,34 +429,7 @@ const Sidebar = ({
             </div>
           )}
 
-          {/* Controls */}
-          {conversation.length > 0 && (
-            <div className="section">
-              <h3>Controls</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <button
-                  className="primary-button"
-                  style={{ width: '100%', background: 'var(--error-bg)', color: 'var(--error-text)', border: '1px solid var(--error-text)', boxShadow: 'none' }}
-                  onClick={onNewThread}
-                >
-                  Reset
-                </button>
-                <button
-                  className="secondary-button"
-                  style={{ width: '100%', justifyContent: 'center' }}
-                  onClick={() => {
-                    if (conversation.length > 0) {
-                      const event = new CustomEvent('undoLastTurn');
-                      window.dispatchEvent(event);
-                    }
-                  }}
-                  disabled={conversation.length === 0}
-                >
-                  Undo
-                </button>
-              </div>
-            </div>
-          )}
+
         </>
       )}
     </div>

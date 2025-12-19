@@ -96,6 +96,14 @@ function App() {
   const [autoSaveError, setAutoSaveError] = useState(null);
   const [lastSnapshotSig, setLastSnapshotSig] = useState('');
 
+  // Update isMobile on resize
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 768px)');
+    const handleChange = (e) => setIsMobile(e.matches);
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
+
   // Track if initial data has been loaded from IndexedDB to prevent race conditions
   const dataLoadedRef = React.useRef(false);
 
@@ -358,6 +366,25 @@ function App() {
       };
 
       const result = await uploadThread(threadData);
+
+      // Update local gallery entry with published timestamp (like handleUploadGalleryThreadToCloud)
+      const turnCount = conversation.length;
+      setGallery(prev => {
+        const updated = (prev || []).map(entry => {
+          if (entry.id === threadId) {
+            return {
+              ...entry,
+              publishedAt: new Date().toISOString(),
+              publishedTurnCount: turnCount
+            };
+          }
+          return entry;
+        });
+        // Persist the updated gallery
+        saveGallery(updated).catch(console.error);
+        return updated;
+      });
+
       setSuccess(`Published to Cloud! ID: ${result.id}`);
       setTimeout(() => setSuccess(null), 3000);
     } catch (err) {
@@ -383,20 +410,32 @@ function App() {
 
         const hasForkInfo = thread?.forkInfo?.parentId && Number.isFinite(thread?.forkInfo?.parentTurn);
 
+        console.log('📸 Thumbnail selection:', {
+          threadId: thread.id,
+          hasForkInfo,
+          forkTurn: thread?.forkInfo?.parentTurn,
+          totalImages: images.length,
+          imageIndices: images.map(x => x.idx)
+        });
+
         if (hasForkInfo) {
           const forkTurn = thread.forkInfo.parentTurn;
           // Prioritize images after the fork point (newest unique content)
           const postFork = images.filter(x => x.idx > forkTurn);
+          console.log('📸 Post-fork images:', postFork.length, 'at indices:', postFork.map(x => x.idx));
           if (postFork.length > 0) {
             // Use the latest post-fork image
             thumbnail = postFork[postFork.length - 1].img;
+            console.log('📸 Using post-fork image at index:', postFork[postFork.length - 1].idx);
           } else if (images.length > 0) {
             // Fallback to last image in thread
             thumbnail = images[images.length - 1].img;
+            console.log('📸 Fallback to last image at index:', images[images.length - 1].idx);
           }
         } else if (images.length > 0) {
           // Non-fork: use first image
           thumbnail = images[0].img;
+          console.log('📸 Non-fork, using first image at index:', images[0].idx);
         }
       }
 
@@ -543,6 +582,54 @@ function App() {
         console.error('Failed to delete thread:', err);
         setError('Failed to delete thread from database.');
       });
+  };
+
+  // Called when cloud gallery is loaded - detect stale local publications
+  const handleCloudGalleryLoaded = (cloudIds) => {
+    if (!gallery || gallery.length === 0) return;
+
+    const cloudIdSet = new Set(cloudIds);
+    const now = Date.now();
+    const GRACE_PERIOD_MS = 60000; // 60 seconds grace period for just-published threads
+    let staleCount = 0;
+
+    setGallery(prev => {
+      if (!prev) return prev;
+
+      const updated = prev.map(entry => {
+        // If this thread was published but no longer exists on cloud, clear publication status
+        // BUT: only if it was published more than 60 seconds ago (avoid race with just-published)
+        if (entry.publishedAt && !cloudIdSet.has(entry.id)) {
+          const publishedTime = new Date(entry.publishedAt).getTime();
+          const ageMs = now - publishedTime;
+
+          if (ageMs > GRACE_PERIOD_MS) {
+            staleCount++;
+            console.log(`🔄 Clearing stale publication for: ${entry.id} (age: ${Math.round(ageMs / 1000)}s)`);
+            return {
+              ...entry,
+              publishedAt: null,
+              publishedTurnCount: null
+            };
+          } else {
+            console.log(`⏳ Skipping recent publication: ${entry.id} (age: ${Math.round(ageMs / 1000)}s)`);
+          }
+        }
+        return entry;
+      });
+
+      if (staleCount > 0) {
+        // Persist the updated gallery
+        saveGallery(updated).catch(console.error);
+      }
+
+      return updated;
+    });
+
+    if (staleCount > 0) {
+      setSuccess(`Detected ${staleCount} thread(s) removed from cloud - cleared local sync status.`);
+      setTimeout(() => setSuccess(null), 3000);
+    }
   };
 
   // Auto-snapshot current thread into local gallery (compressed)
@@ -816,31 +903,6 @@ function App() {
     window.location.hash = '#/new';
   };
 
-  // True full-bleed gallery: do NOT render under `.app` which is max-width constrained.
-  if (view === 'gallery') {
-    return (
-      <Gallery
-        localGallery={gallery}
-        // "Resume" card comes from current in-memory (possibly persisted) session
-        currentSession={{
-          threadId,
-          conversation,
-          style,
-          model,
-          forkInfo,
-          timestamp: new Date().toISOString(),
-        }}
-        isLoading={isLoading}
-        onNewThread={handleNewThread}
-        onOpenThread={(t, isCloud) => handleOpenThread(t, isCloud)}
-        onForkThread={(t, isCloud) => handleForkThread(t, isCloud)}
-        onDeleteThread={(id) => handleDeleteFromGallery(id)}
-        onUploadToCloud={handleUploadGalleryThreadToCloud}
-        isRemote={isRemote}
-      />
-    );
-  }
-
   const handleDetachFork = async () => {
     setForkInfo(null);
 
@@ -897,37 +959,73 @@ function App() {
     onForkCloud: () => handleForkThread({ id: threadId, conversation, style, model, forkInfo }, isRemote)
   };
 
+  // True full-bleed gallery: do NOT render under `.app` which is max-width constrained.
+  if (view === 'gallery') {
+    return (
+      <>
+        <Gallery
+          localGallery={gallery}
+          // "Resume" card comes from current in-memory (possibly persisted) session
+          currentSession={{
+            threadId,
+            conversation,
+            style,
+            model,
+            forkInfo,
+            timestamp: new Date().toISOString(),
+          }}
+          isLoading={isLoading}
+          onNewThread={handleNewThread}
+          onOpenThread={(t, isCloud) => handleOpenThread(t, isCloud)}
+          onForkThread={(t, isCloud) => handleForkThread(t, isCloud)}
+          onDeleteThread={(id) => handleDeleteFromGallery(id)}
+          onUploadToCloud={handleUploadGalleryThreadToCloud}
+          onCloudGalleryLoaded={handleCloudGalleryLoaded}
+          onOpenSettings={() => setShowSettings(true)}
+          isRemote={isRemote}
+        />
+        {/* Settings Sheet for Gallery - must be rendered at this level */}
+        <SettingsSheet open={showSettings} title="Settings" onClose={() => setShowSettings(false)}>
+          <Sidebar
+            {...sidebarProps}
+            isModal={true}
+            isCollapsed={false}
+            onOpenGallery={() => {
+              setShowSettings(false);
+              window.location.hash = '#/gallery';
+            }}
+          />
+        </SettingsSheet>
+      </>
+    );
+  }
+
+
+
   return (
     <div className="app">
-      <header className="header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 20px' }}>
-        <div>
-          <h1>🎨 Only Details Matter</h1>
-          <p style={{ display: 'none' }}>
-            Iteratively test how a generative model latches onto a single visual detail.
-          </p>
-        </div>
-        <button
-          className="secondary-button"
-          onClick={() => window.location.hash = '#/gallery'}
-          style={{ marginLeft: '20px' }}
-        >
-          🏠 Home / Gallery
-        </button>
-
-        {isMobile && (
+      <header className="rpg-header">
+        <h1 className="rpg-main-title">Only Details Matter</h1>
+        <div className="rpg-header__controls">
           <button
-            className="primary-button"
+            className="mobile-back-btn"
+            onClick={() => window.location.hash = '#/gallery'}
+            title="Go to Gallery"
+          >
+            🏠 Gallery
+          </button>
+
+          <button
+            className="mobile-back-btn"
             onClick={() => setShowSettings(true)}
-            style={{ marginLeft: '10px' }}
+            title="Open Settings"
           >
             ⚙️ Settings
           </button>
-        )}
+        </div>
       </header>
 
-      <div className={`main-content ${isSidebarCollapsed && !isMobile ? 'sidebar-collapsed' : ''}`}>
-        {!isMobile && <Sidebar {...sidebarProps} />}
-
+      <div className="main-content">
         <MainArea
           conversation={conversation}
           setConversation={setConversation}
@@ -950,20 +1048,32 @@ function App() {
           isRemote={isRemote}
           onForkThread={() => handleForkThread({ id: threadId, conversation, style, model, forkInfo }, isRemote)}
           onUploadThread={() => handleUploadGalleryThreadToCloud({ id: threadId, conversation, style, model, forkInfo })}
+          onOpenGallery={() => window.location.hash = '#/gallery'}
+          onOpenSettings={() => setShowSettings(true)}
+          isSynced={(() => {
+            const entry = (gallery || []).find(e => e.id === threadId);
+            return !!entry?.publishedAt;
+          })()}
+          hasNewChanges={(() => {
+            const entry = (gallery || []).find(e => e.id === threadId);
+            if (!entry?.publishedAt) return false;
+            return conversation.length !== entry.publishedTurnCount;
+          })()}
         />
       </div>
 
-      {isMobile && (
-        <SettingsSheet open={showSettings} title="Settings" onClose={() => setShowSettings(false)}>
-          <Sidebar
-            {...sidebarProps}
-            onOpenGallery={() => {
-              setShowSettings(false);
-              window.location.hash = '#/gallery';
-            }}
-          />
-        </SettingsSheet>
-      )}
+      {/* Settings Sheet - always rendered, visibility controlled by open prop */}
+      <SettingsSheet open={showSettings} title="Settings" onClose={() => setShowSettings(false)}>
+        <Sidebar
+          {...sidebarProps}
+          isModal={true}
+          isCollapsed={false}
+          onOpenGallery={() => {
+            setShowSettings(false);
+            window.location.hash = '#/gallery';
+          }}
+        />
+      </SettingsSheet>
     </div>
   );
 }
