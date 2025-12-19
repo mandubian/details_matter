@@ -77,15 +77,8 @@ const Gallery = ({
     }
   }, [hasEnteredExhibition]);
 
-  // Load cloud gallery when tab switches or config changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (activeTab === 'cloud' && !isConfiguring && getWorkerUrl()) {
-      loadCloudGallery();
-    }
-  }, [activeTab, isConfiguring]);
-
-  const loadCloudGallery = async (reset = true) => {
+  // Load cloud gallery - memoized to use as dependency
+  const loadCloudGallery = useCallback(async (reset = true) => {
     setLoadingCloud(true);
     let loadedThreads = [];
     try {
@@ -122,10 +115,16 @@ const Gallery = ({
       console.error('Cloud gallery load error:', err);
     }
     setLoadingCloud(false);
-  };
+  }, [searchQuery, cloudOffset, onCloudGalleryLoaded]);
+
+  // Load cloud gallery when tab switches or config changes
+  useEffect(() => {
+    if (activeTab === 'cloud' && !isConfiguring && getWorkerUrl()) {
+      loadCloudGallery(true);
+    }
+  }, [activeTab, isConfiguring, loadCloudGallery]);
 
   // Debounced search effect
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (activeTab !== 'cloud') return;
 
@@ -140,7 +139,7 @@ const Gallery = ({
     return () => {
       if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     };
-  }, [searchQuery]);
+  }, [searchQuery, activeTab, loadCloudGallery]);
 
   const loadMoreCloud = () => {
     if (!loadingCloud && hasMoreCloud) {
