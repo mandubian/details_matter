@@ -81,6 +81,7 @@ function App() {
   // We'll show a "Resume last session" card there if conversation exists.
   const [view, setView] = useState('gallery');
   const [isRemote, setIsRemote] = useState(false); // Track if current thread is cloud/read-only
+  // eslint-disable-next-line no-unused-vars
   const [isMobile, setIsMobile] = useState(() => window.matchMedia?.('(max-width: 768px)')?.matches ?? false);
   const [showSettings, setShowSettings] = useState(false);
   // Collapsed sidebar state lifted from Sidebar component

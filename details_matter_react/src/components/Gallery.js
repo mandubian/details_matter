@@ -18,6 +18,7 @@ const Gallery = ({
   isRemote
 }) => {
   const [activeTab, setActiveTab] = useState('cloud'); // 'local' or 'cloud' as default
+  // eslint-disable-next-line no-unused-vars
   const [browseMode, setBrowseMode] = useState('wall'); // 'wall' | 'tree'
   // eslint-disable-next-line no-unused-vars
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -76,6 +77,8 @@ const Gallery = ({
     }
   }, [hasEnteredExhibition]);
 
+  // Load cloud gallery when tab switches or config changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (activeTab === 'cloud' && !isConfiguring && getWorkerUrl()) {
       loadCloudGallery();
@@ -122,6 +125,7 @@ const Gallery = ({
   };
 
   // Debounced search effect
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (activeTab !== 'cloud') return;
 
