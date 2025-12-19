@@ -742,7 +742,8 @@ const Gallery = ({
 
       {/* MAIN LIST */}
       <main className="rpg-main" ref={mainRef} onScroll={handleScroll}>
-        {browseMode === 'wall' && !genealogyThreadId && !hasEnteredExhibition && (
+        {/* Hero always shows at top in wall mode (not genealogy tree) */}
+        {browseMode === 'wall' && !genealogyThreadId && (
           <LandingHero
             onBeginEvolution={() => {
               setHasEnteredExhibition(true);
@@ -752,8 +753,8 @@ const Gallery = ({
           />
         )}
 
-        {/* Search Panel - visible for both tabs when exhibition is entered */}
-        {hasEnteredExhibition && (
+        {/* Search Panel - always visible below hero */}
+        {browseMode === 'wall' && !genealogyThreadId && (
           <div className="rpg-notice-panel">
             <div style={{
               display: 'flex',
@@ -831,7 +832,7 @@ const Gallery = ({
         )}
 
         {/* Load More button for cloud gallery */}
-        {activeTab === 'cloud' && hasEnteredExhibition && hasMoreCloud && !searchQuery && (
+        {activeTab === 'cloud' && hasMoreCloud && !searchQuery && browseMode === 'wall' && !genealogyThreadId && (
           <div style={{
             display: 'flex',
             justifyContent: 'center',
