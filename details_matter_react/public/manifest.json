@@ -1,6 +1,6 @@
 {
   "short_name": "Details Matter",
-  "name": "Only Details Matter - AI Image Evolution",
+  "name": "Only Details Matter",
   "icons": [
     {
       "src": "favicon.png",
@@ -12,5 +12,5 @@
   "display": "standalone",
   "theme_color": "#1a100a",
   "background_color": "#1a100a",
-  "description": "Iteratively explore how generative AI models evolve visual details in an Art Nouveau RPG setting."
+  "description": "An AI-powered creative experiment that explores the evolution of visual narratives through iterative detail discovery."
 }
