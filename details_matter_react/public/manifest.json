@@ -10,6 +10,7 @@
   ],
   "start_url": ".",
   "display": "standalone",
-  "theme_color": "#000000",
-  "background_color": "#ffffff"
+  "theme_color": "#1a100a",
+  "background_color": "#1a100a",
+  "description": "Iteratively explore how generative AI models evolve visual details in an Art Nouveau RPG setting."
 }
