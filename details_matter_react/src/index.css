@@ -881,7 +881,7 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: radial-gradient(circle at center, rgba(26, 16, 8, 0.1) 0%, rgba(26, 16, 8, 0.4) 100%);
+  background: transparent;
   pointer-events: none;
 }
 
@@ -892,11 +892,7 @@ body {
   text-align: center;
   animation: fadeInHero 1.2s ease-out;
   padding: 50px 40px;
-  /* Subtle backdrop to help text stand out against busy background */
-  background: radial-gradient(ellipse 90% 80% at center,
-      rgba(245, 240, 225, 0.35) 0%,
-      rgba(245, 240, 225, 0.15) 50%,
-      transparent 80%);
+  background: transparent;
   border-radius: 20px;
 }
 
