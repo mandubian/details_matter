@@ -4,7 +4,7 @@ An AI-powered creative experiment that explores the evolution of visual narrativ
 
 **[Live Demo →](https://only-details-matter.pages.dev)**
 
-![Screenshot](details_matter_react/src/wall-bg.png)
+![Screenshot](details_matter_react/src/hero-art-nouveau_with_title.png)
 
 ## 🎨 The Concept
 
