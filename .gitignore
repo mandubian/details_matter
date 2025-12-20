@@ -33,3 +33,6 @@ uv.lock
 
 # Streamlit local config
 .streamlit/
+
+# Local notes
+tweets.md

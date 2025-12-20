@@ -2,9 +2,9 @@
 
 An AI-powered creative experiment that explores the evolution of visual narratives through iterative detail discovery.
 
-**[Live Demo →](https://only-details-matter.pages.dev)**
+**[Live Demo →](https://details-matter.pages.dev)**
 
-![Screenshot](details_matter_react/src/hero-art-nouveau_with_title.png)
+![Screenshot](details_matter_react/src/assets/hero-art-nouveau_with_title.png)
 
 ## 🎨 The Concept
 

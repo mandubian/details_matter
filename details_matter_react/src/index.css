@@ -314,7 +314,7 @@ body {
   scrollbar-color: var(--gold-mid) #1a1a0f;
 
   /* Unified Art Nouveau background with integrated side bands */
-  background-image: url('./app-bg.png');
+  background-image: url('./assets/app-bg.png');
   background-size: min(100%, 1900px) auto;
   /* Cap at 1900px to match card grid */
   background-repeat: repeat-y;
@@ -352,7 +352,7 @@ body {
 /* Remove the jumpy media query */
 
 .rpg-card {
-  background-image: url('./card-frame.png');
+  background-image: url('./assets/card-frame.png');
   background-size: 100% 100%;
   background-repeat: no-repeat;
   background-color: transparent;
@@ -773,7 +773,7 @@ body {
 
   /* Art Nouveau Background with integrated title */
   background-color: #1a1008;
-  background-image: url('./hero-art-nouveau_with_title.png');
+  background-image: url('./assets/hero-art-nouveau_with_title.png');
   background-size: cover;
   background-position: center;
 
@@ -1716,7 +1716,7 @@ body {
   flex: 1;
   overflow-y: auto;
   padding: 30px;
-  background-image: url('./app-bg.png');
+  background-image: url('./assets/app-bg.png');
   background-size: min(100%, 1400px) auto;
   background-repeat: repeat-y;
   background-position: top center;
