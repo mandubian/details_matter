@@ -63,14 +63,46 @@ body {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
   z-index: 1000;
   padding: 10px 0 20px 0;
-  transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1), opacity 0.4s ease;
-  will-change: transform, opacity;
+  transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+  will-change: transform, opacity, height, padding;
+  overflow: hidden;
 }
 
 .rpg-header--hidden {
   transform: translateY(-100%);
+  height: 0 !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  border-bottom-width: 0 !important;
   opacity: 0;
   pointer-events: none;
+}
+
+.rpg-header__hero-toggle {
+  background: transparent;
+  border: none;
+  color: var(--gold-dark);
+  font-size: 1.5rem;
+  cursor: pointer;
+  margin-right: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.rpg-header__hero-toggle:hover {
+  color: var(--gold-light);
+  background: rgba(197, 160, 89, 0.1);
+  transform: scale(1.1);
+}
+
+.rpg-header__hero-toggle.active {
+  color: var(--gold-mid);
+  text-shadow: 0 0 10px var(--gold-light);
 }
 
 .rpg-header::after {
@@ -277,11 +309,12 @@ body {
   padding: 0;
   /* Padding handled by children if needed */
   position: relative;
+  /* Sage green scrollbar */
   scrollbar-width: thin;
-  scrollbar-color: var(--gold-mid) #1a100a;
+  scrollbar-color: var(--gold-mid) #1a1a0f;
 
   /* Unified Art Nouveau background with integrated side bands */
-  background-image: url('./wall-bg.png');
+  background-image: url('./app-bg.png');
   background-size: min(100%, 1900px) auto;
   /* Cap at 1900px to match card grid */
   background-repeat: repeat-y;
@@ -290,7 +323,6 @@ body {
   /* Scroll with content */
 }
 
-/* === GRID LAYOUT === */
 .rpg-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -301,10 +333,20 @@ body {
   padding: 140px 40px 40px 40px;
   box-sizing: border-box;
   position: relative;
+  transition: padding-top 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+.rpg-layout--header-hidden .rpg-grid {
+  padding-top: 40px !important;
 }
 
 .rpg-tree-container {
   padding-top: 120px;
+  transition: padding-top 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+}
+
+.rpg-layout--header-hidden .rpg-tree-container {
+  padding-top: 20px !important;
 }
 
 /* Remove the jumpy media query */
@@ -609,13 +651,65 @@ body {
 
 /* === UTILS & LEGACY ADAPTERS === */
 .rpg-notice-panel {
-  background: rgba(0, 0, 0, 0.6);
-  margin-bottom: 20px;
-  border-radius: 8px;
-  padding: 16px;
-  border: 1px dashed var(--gold-dark);
-  color: var(--text-muted);
+  background: transparent;
+  margin: 0 auto;
+  border-radius: 0;
+  padding: 10px 20px;
+  border: none;
+  color: #fff;
   text-align: center;
+  transition: padding-top 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+  width: 100%;
+  max-width: 800px;
+}
+
+.rpg-notice-panel__search-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.rpg-layout--header-hidden .rpg-notice-panel {
+  padding-top: 10px !important;
+}
+
+.rpg-search-input {
+  flex: 1;
+  max-width: 500px;
+  background: rgba(10, 15, 8, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1.5px solid var(--hero-gold);
+  border-radius: 25px;
+  color: var(--hero-gold-bright);
+  padding: 8px 20px;
+  font-family: 'Playfair Display', serif;
+  font-size: 0.95rem;
+  font-style: italic;
+  transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+  outline: none;
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.5),
+    0 2px 10px rgba(197, 160, 89, 0.12);
+  letter-spacing: 0.5px;
+}
+
+.rpg-search-input:focus {
+  background: rgba(197, 160, 89, 0.1);
+  border-color: var(--hero-gold-bright);
+  box-shadow:
+    inset 0 4px 12px rgba(0, 0, 0, 0.8),
+    0 0 25px rgba(197, 160, 89, 0.3),
+    0 0 0 4px rgba(197, 160, 89, 0.05);
+  transform: translateY(-1px);
+}
+
+.rpg-search-input::placeholder {
+  color: var(--hero-gold);
+  opacity: 0.5;
+  letter-spacing: 1px;
 }
 
 .rpg-input {
@@ -667,56 +761,74 @@ body {
 
   position: relative;
   width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
   min-height: 85vh;
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-sizing: border-box;
+
+  /* Art Nouveau Background with integrated title */
+  background-color: #1a1008;
+  background-image: url('./hero-art-nouveau_with_title.png');
+  background-size: cover;
+  background-position: center;
+
+  /* Removed background-attachment: fixed as it scales to viewport instead of container */
+
+  /* Border/Shadow to sync with gallery feel */
+  border-left: 1px solid rgba(197, 160, 89, 0.2);
+  border-right: 1px solid rgba(197, 160, 89, 0.2);
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+
+  border-bottom: none;
+  /* Handled by shelf */
+  margin-bottom: 0;
+  /* Handled by shelf */
+  transition: min-height 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rpg-landing-hero.is-collapsed {
+  min-height: 0;
+}
+
+.rpg-landing-hero__inner {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 80px 20px;
   box-sizing: border-box;
+  opacity: 1;
+  max-height: 2000px;
+  transition:
+    max-height 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.4s ease-in-out,
+    padding 0.6s ease-in-out;
   overflow: hidden;
-
-  /* Shared Wall Background */
-  background-color: #1a1008;
-  background-image: url('./wall-bg.png');
-  background-attachment: fixed;
-  background-size: initial;
-  background-position: center;
-
-  border-bottom: 2px solid var(--hero-gold);
-  margin-bottom: 40px;
-  max-width: 100vw;
+  position: relative;
 }
 
-/* Ornate Gilded Inlay Border (Art Nouveau Picture Frame) */
-.rpg-landing-hero::before {
-  content: "";
-  position: absolute;
-  top: 35px;
-  left: 35px;
-  right: 35px;
-  bottom: 35px;
-  border: 1px solid var(--hero-gold);
-  border-radius: 4px;
+.rpg-landing-hero.is-collapsed .rpg-landing-hero__inner {
+  max-height: 0;
+  opacity: 0;
+  padding: 0;
   pointer-events: none;
-  z-index: 1;
-  opacity: 0.8;
-  box-shadow:
-    0 0 15px rgba(0, 0, 0, 0.4),
-    inset 0 0 15px rgba(0, 0, 0, 0.4);
+}
+
+/* Frame Borders Removed to showcase background art */
+.rpg-landing-hero::before {
+  display: none;
 }
 
 /* Second Inner Line for Detail */
 .rpg-landing-hero::after {
-  content: "";
-  position: absolute;
-  top: 45px;
-  left: 45px;
-  right: 45px;
-  bottom: 45px;
-  border: 4px double var(--hero-gold);
-  pointer-events: none;
-  z-index: 1;
-  opacity: 0.3;
+  display: none;
 }
 
 .rpg-landing-hero__flourish-tr,
@@ -725,9 +837,9 @@ body {
   position: absolute;
   font-size: 5rem;
   color: var(--hero-gold);
-  opacity: 0.5;
+  opacity: 0.2;
   z-index: 2;
-  filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.8));
+  filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.5));
   pointer-events: none;
   line-height: 1;
 }
@@ -738,9 +850,9 @@ body {
   position: absolute;
   font-size: 5rem;
   color: var(--hero-gold);
-  opacity: 0.5;
+  opacity: 0.2;
   z-index: 2;
-  filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.8));
+  filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.5));
   pointer-events: none;
   line-height: 1;
 }
@@ -769,7 +881,7 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background: radial-gradient(circle at center, rgba(26, 16, 8, 0.4) 0%, rgba(26, 16, 8, 0.8) 100%);
+  background: radial-gradient(circle at center, rgba(26, 16, 8, 0.1) 0%, rgba(26, 16, 8, 0.4) 100%);
   pointer-events: none;
 }
 
@@ -779,7 +891,13 @@ body {
   max-width: 800px;
   text-align: center;
   animation: fadeInHero 1.2s ease-out;
-  padding: 40px;
+  padding: 50px 40px;
+  /* Subtle backdrop to help text stand out against busy background */
+  background: radial-gradient(ellipse 90% 80% at center,
+      rgba(245, 240, 225, 0.35) 0%,
+      rgba(245, 240, 225, 0.15) 50%,
+      transparent 80%);
+  border-radius: 20px;
 }
 
 @keyframes fadeInHero {
@@ -794,69 +912,127 @@ body {
   }
 }
 
-.rpg-landing-hero__title {
-  font-family: 'Cinzel', serif;
-  font-size: clamp(2.8rem, 9vw, 5.5rem);
-  font-weight: 900;
+.rpg-landing-hero__logo {
+  width: clamp(280px, 80vw, 850px);
+  height: clamp(180px, 55vw, 550px);
+  margin: clamp(60px, 12vh, 120px) auto 10px auto;
+  background-image: url('./assets/only_details_matter.png');
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+
+  /* Blending with transparency as requested */
+  mix-blend-mode: multiply;
+  opacity: 0.95;
+  filter: brightness(1.05) contrast(1.1);
+  /* Keep the text punchy while blending */
+
+  position: relative;
+  z-index: 5;
+  transition: all 0.5s ease;
+}
+
+/* Mobile adjustments */
+
+
+.rpg-landing-hero__tagline-upper {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(1.3rem, 3.5vw, 1.8rem);
+  color: #1a2818;
+  /* Dark green */
   margin: 0;
-  line-height: 1.1;
-  text-transform: uppercase;
-  letter-spacing: 4px;
-  background: linear-gradient(to bottom, var(--hero-gold-bright) 20%, var(--hero-gold) 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.8));
-}
-
-.rpg-landing-hero__tagline {
-  font-family: 'Playfair Display', serif;
-  font-size: clamp(1.1rem, 3vw, 2.2rem);
-  color: var(--hero-gold);
-  margin: 25px 0;
-  font-weight: 400;
-  letter-spacing: 2px;
+  font-weight: 700;
+  letter-spacing: 3px;
   font-style: italic;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  text-transform: lowercase;
+
+  /* Glass Plaque Look */
+  padding: 12px 40px;
+  background: rgba(255, 250, 240, 0.15);
+  /* Very faint cream glass */
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-top: 1.5px solid rgba(204, 176, 121, 0.4);
+  border-bottom: 1.5px solid rgba(204, 176, 121, 0.4);
+
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Center the flex content */
+  gap: 15px;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.4);
 }
 
-.rpg-landing-hero__tagline-sub {
-  font-family: 'Lato', sans-serif;
-  font-size: 0.5em;
-  opacity: 0.9;
-  margin-top: 15px;
+/* Flourishes for Upper Tagline */
+.rpg-landing-hero__tagline-upper::before,
+.rpg-landing-hero__tagline-upper::after {
+  content: '❧';
+  color: #a07830;
+  font-size: 1.5rem;
   font-style: normal;
-  text-transform: uppercase;
-  letter-spacing: 6px;
-  color: var(--hero-text);
-  display: block;
+}
+
+.rpg-landing-hero__tagline-upper::after {
+  transform: scaleX(-1);
+}
+
+.rpg-landing-hero__tagline-lower {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(1.1rem, 2.2vw, 1.4rem);
+  line-height: 1.6;
+  color: #1a2818;
+  /* Dark green */
+  margin: 30px auto 40px auto;
+  font-weight: 600;
+  font-style: italic;
+  max-width: 650px;
+
+  /* Ornate Glass Plaque */
+  padding: 24px 35px;
+  background: rgba(255, 250, 240, 0.1);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  /* Elegant Double Border Effect */
+  box-shadow:
+    0 0 0 1px rgba(204, 176, 121, 0.2),
+    inset 0 0 0 1px rgba(204, 176, 121, 0.2);
+  border: 1px solid rgba(204, 176, 121, 0.4);
+  border-radius: 4px;
+
+  position: relative;
+  text-align: center;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.3);
+}
+
+/* Decorative Ornaments for Lower Plaque */
+.rpg-landing-hero__tagline-lower::before {
+  content: '❧';
+  position: absolute;
+  top: -14px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: transparent;
+  color: #a07830;
+  font-size: 1.8rem;
+  font-style: normal;
+  z-index: 1;
 }
 
 .rpg-landing-hero__description-box {
-  background: rgba(26, 16, 8, 0.6);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  padding: 40px;
-  border: 1px solid var(--hero-gold);
-  border-radius: 2px;
-  margin: 45px auto;
+  background: rgba(26, 16, 8, 0.3);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  padding: 30px;
+  margin: 35px auto;
   max-width: 650px;
-  box-shadow:
-    0 20px 50px rgba(0, 0, 0, 0.5),
-    inset 0 0 40px rgba(0, 0, 0, 0.5);
   position: relative;
 }
 
 /* Internal "Picture Frame" Inset */
 .rpg-landing-hero__description-box::after {
-  content: "";
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  right: 8px;
-  bottom: 8px;
-  border: 1px solid rgba(197, 160, 89, 0.4);
-  pointer-events: none;
+  display: none;
 }
 
 .rpg-landing-hero__description {
@@ -979,19 +1155,130 @@ body {
   letter-spacing: 1px;
 }
 
+/* SEARCH SHELF - STICKY BAR (sibling of hero, not inside it) */
+.rpg-search-shelf {
+  width: 100%;
+  position: sticky;
+  top: 0;
+  /* Sticks to top of .rpg-main viewport (which is already below the header) */
+  z-index: 150;
+  padding: 10px 0 12px 0;
+  transition: background 0.4s ease;
+
+  /* The Visual Bridge: Gradient from Hero Darkish Brown to App Deep Forest Green */
+  background: linear-gradient(to bottom,
+      rgba(26, 16, 8, 0.98) 0%,
+      rgba(13, 18, 9, 0.99) 50%,
+      rgba(10, 18, 9, 1) 100%);
+
+  /* Top Edge - Gold Detail */
+  border-top: 2px solid transparent;
+  border-image: linear-gradient(to right, transparent, var(--gold-mid), transparent) 1;
+
+  /* Bottom Edge - Deep Shadow */
+  border-bottom: 1px solid #050804;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.8),
+    0 -5px 20px rgba(0, 0, 0, 0.3);
+
+  /* Art Nouveau Plinth Texture */
+  background-image:
+    radial-gradient(circle at 50% -20%, rgba(197, 160, 89, 0.08), transparent 60%),
+    linear-gradient(to bottom, rgba(26, 16, 8, 0.95), rgba(10, 18, 9, 1));
+}
+
+.rpg-layout--header-hidden .rpg-search-shelf {
+  top: 0;
+}
+
+/* Toggle button in search shelf */
+.rpg-search-shelf__toggle {
+  background: transparent;
+  border: 1px solid var(--gold-dark);
+  color: var(--gold-mid);
+  font-size: 1.3rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.rpg-search-shelf__toggle:hover {
+  color: var(--gold-light);
+  background: rgba(197, 160, 89, 0.15);
+  border-color: var(--gold-mid);
+  transform: scale(1.1);
+}
+
+.rpg-search-shelf__toggle.active {
+  color: var(--gold-light);
+  text-shadow: 0 0 10px var(--gold-light);
+  border-color: var(--gold-light);
+  background: rgba(197, 160, 89, 0.1);
+}
+
+@media (max-width: 768px) {
+  .rpg-search-shelf {
+    padding: 8px 0 10px 0;
+  }
+
+  .rpg-search-shelf__toggle {
+    width: 32px;
+    height: 32px;
+    font-size: 1.1rem;
+  }
+}
+
+@media (max-width: 650px) {
+  .rpg-search-shelf {
+    padding: 6px 0 8px 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .rpg-search-shelf {
+    padding: 5px 0 6px 0;
+  }
+
+  .rpg-search-input {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+  }
+}
+
 @media (max-width: 768px) {
   .rpg-landing-hero {
-    height: 100dvh;
+    height: auto;
     min-height: 100dvh;
-    padding: 0 15px;
+    padding: 0;
     width: 100vw;
     margin: 0 !important;
     left: 0;
     top: 0;
     position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  }
+
+  .rpg-landing-hero.is-collapsed {
+    min-height: 0;
+  }
+
+  .rpg-landing-hero__inner {
+    padding: 60px 15px;
+    min-height: calc(100dvh - 80px);
+    /* Leave room for shelf */
+  }
+
+  .rpg-landing-hero.is-collapsed .rpg-landing-hero__inner {
+    min-height: 0;
   }
 
   .rpg-landing-hero__content {
@@ -1001,8 +1288,9 @@ body {
   }
 
   .rpg-landing-hero__title {
-    font-size: clamp(1.8rem, 8vw, 2.3rem);
-    letter-spacing: 0.5px;
+    font-size: clamp(2.8rem, 12vw, 4rem);
+    letter-spacing: -1px;
+    margin-top: 120px;
   }
 
   /* Tiny frames on mobile */
@@ -1086,6 +1374,11 @@ body {
     /* Increased for safe clearance */
     padding-left: 20px;
     padding-right: 20px;
+    transition: padding-top 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+  }
+
+  .rpg-layout--header-hidden .rpg-grid {
+    padding-top: 20px !important;
   }
 
   /* Ribbons: smaller on mobile */
@@ -1116,7 +1409,7 @@ body {
     }
 
     .rpg-header {
-      height: 85px !important;
+      height: 85px;
     }
 
     .rpg-main-title {
@@ -1427,7 +1720,7 @@ body {
   flex: 1;
   overflow-y: auto;
   padding: 30px;
-  background-image: url('./wall-bg.png');
+  background-image: url('./app-bg.png');
   background-size: min(100%, 1400px) auto;
   background-repeat: repeat-y;
   background-position: top center;
@@ -2545,9 +2838,10 @@ label {
   padding: 140px 24px 24px 24px;
   /* Top padding to clear sticky header */
   min-height: 100%;
+  transition: padding-top 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+
   /* Avoid expensive SVG turbulence (can crash tabs on some GPUs) */
-  background:
-    radial-gradient(1200px 700px at 50% 0%, rgba(197, 160, 89, 0.08), transparent 60%),
+  background: radial-gradient(1200px 700px at 50% 0%, rgba(197, 160, 89, 0.08), transparent 60%),
     repeating-linear-gradient(135deg,
       rgba(255, 255, 255, 0.015) 0px,
       rgba(255, 255, 255, 0.015) 2px,
@@ -2555,6 +2849,10 @@ label {
       transparent 10px),
     linear-gradient(to bottom, #1a1008 0%, #0d0805 100%);
   overflow-y: auto;
+}
+
+.rpg-layout--header-hidden .genealogy-tree {
+  padding-top: 24px !important;
 }
 
 .genealogy-tree--empty {
@@ -2796,6 +3094,10 @@ label {
   .genealogy-tree {
     padding: 180px 16px 16px 16px;
     /* Top padding to clear sticky header on mobile */
+  }
+
+  .rpg-layout--header-hidden .genealogy-tree {
+    padding-top: 16px !important;
   }
 
   .genealogy-node {
@@ -3200,6 +3502,11 @@ label {
     grid-template-columns: repeat(2, 1fr);
     gap: 24px;
     padding: 180px 20px 40px 20px;
+    transition: padding-top 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+  }
+
+  .rpg-layout--header-hidden .rpg-grid {
+    padding-top: 20px !important;
   }
 
   .rpg-header {
@@ -3490,6 +3797,70 @@ label {
   border-color: var(--gold-mid);
 }
 
+.rpg-landing-hero__scroll-text {
+  font-family: 'Cinzel', serif;
+  font-size: 0.9rem;
+  color: var(--gold-light);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-top: 10px;
+}
+
+/* === COLLAPSIBLE HERO ANIMATION === */
+.rpg-landing-hero {
+  max-height: 2000px;
+  /* Large enough for content */
+  overflow: hidden;
+  transition: max-height 0.6s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.4s ease-in-out,
+    margin 0.6s ease-in-out,
+    padding 0.6s ease-in-out;
+  opacity: 1;
+  position: relative;
+  /* Ensure children like close button are relative to this */
+}
+
+.rpg-landing-hero.is-collapsed {
+  max-height: 0;
+  min-height: 0;
+  opacity: 0;
+  margin: 0;
+  padding: 0;
+  pointer-events: none;
+  border: none;
+}
+
+.rpg-landing-hero__close {
+  position: absolute;
+  top: 25px;
+  right: 25px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--gold-mid);
+  color: var(--gold-light);
+  font-size: 1.8rem;
+  cursor: pointer;
+  z-index: 100;
+  transition: all 0.3s;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+  /* Ensure clickable even if parent has pointer-events: none when collapsed (but we handle that on parent) */
+}
+
+.rpg-landing-hero__close:hover {
+  color: white;
+  background: var(--gold-dark);
+  transform: rotate(90deg) scale(1.1);
+  box-shadow: 0 0 15px var(--gold-mid);
+}
+
+
 .help-page__title {
   font-family: 'Cinzel', serif;
   font-size: 1.8rem;
@@ -3613,5 +3984,99 @@ label {
 
   .help-page__section h2 {
     font-size: 1.1rem;
+  }
+}
+
+/* === EXHIBITION EPILOGUE === */
+.rpg-exhibition-epilogue {
+  padding: 100px 40px 140px 40px;
+  max-width: 800px;
+  margin: 0 auto;
+  text-align: center;
+  position: relative;
+  z-index: 5;
+}
+
+.rpg-exhibition-epilogue__inner {
+  background: radial-gradient(ellipse 90% 80% at center,
+      rgba(245, 240, 225, 0.1) 0%,
+      rgba(245, 240, 225, 0.05) 50%,
+      transparent 90%);
+  padding: 60px 40px;
+  border-top: 1px inset rgba(197, 160, 89, 0.2);
+  border-bottom: 1px outset rgba(197, 160, 89, 0.2);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: 4px;
+}
+
+.rpg-exhibition-epilogue__tagline-upper {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(1.4rem, 4vw, 2.2rem);
+  color: #f5f0e1;
+  /* Creamy White */
+  margin-bottom: 30px;
+  font-weight: 600;
+  font-style: italic;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  text-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.8),
+    -1px -1px 0 #8b6914,
+    1px -1px 0 #8b6914,
+    -1px 1px 0 #8b6914,
+    1px 1px 0 #8b6914;
+  /* Stronger dark gold outline and deep shadow */
+}
+
+.rpg-exhibition-epilogue__tagline-upper .flourish {
+  color: #f3e5ab;
+  /* Bright Gold */
+  font-style: normal;
+  font-size: 1.2em;
+  opacity: 0.9;
+}
+
+.rpg-exhibition-epilogue__divider {
+  margin: 20px auto 30px auto;
+  color: #f3e5ab;
+  /* Bright Gold */
+  font-size: 1.5rem;
+  opacity: 0.8;
+}
+
+.rpg-exhibition-epilogue__tagline-lower {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(1.1rem, 2.5vw, 1.3rem);
+  line-height: 1.6;
+  color: #e8dcc0;
+  /* Light Ivory */
+  max-width: 600px;
+  margin: 0 auto;
+  font-weight: 500;
+  font-style: italic;
+  text-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
+}
+
+.rpg-exhibition-epilogue__flourish-bottom {
+  margin-top: 40px;
+  color: #c5a059;
+  /* --hero-gold */
+  opacity: 0.4;
+  font-size: 1rem;
+  letter-spacing: 10px;
+}
+
+/* Mobile responsive fixes */
+@media (max-width: 768px) {
+  .rpg-exhibition-epilogue {
+    padding: 60px 20px 100px 20px;
+  }
+
+  .rpg-exhibition-epilogue__inner {
+    padding: 40px 20px;
   }
 }

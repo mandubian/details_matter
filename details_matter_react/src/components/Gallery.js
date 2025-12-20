@@ -39,6 +39,18 @@ const Gallery = ({
     return window.location.hash === '#/gallery' || window.location.hash.startsWith('#/lineage/');
   });
 
+  const [isHeroCollapsed, setIsHeroCollapsed] = useState(() => {
+    return localStorage.getItem('isHeroCollapsed') === 'true';
+  });
+
+  const toggleHero = () => {
+    setIsHeroCollapsed(prev => {
+      const next = !prev;
+      localStorage.setItem('isHeroCollapsed', String(next));
+      return next;
+    });
+  };
+
   // Search and pagination state
   const [searchQuery, setSearchQuery] = useState('');
   const [hasMoreCloud, setHasMoreCloud] = useState(false);
@@ -680,34 +692,41 @@ const Gallery = ({
   const handleScroll = useCallback(() => {
     if (!mainRef.current) return;
 
-    // If LandingHero is not active, always show header
-    const isHeroActive = browseMode === 'wall' && !genealogyThreadId && !hasEnteredExhibition;
-    if (!isHeroActive) {
+    const scrollTop = mainRef.current.scrollTop;
+
+    // Header visibility logic:
+    // 1. If hero is collapsed, header is always shown
+    // 2. If hero is expanded, header shows only after small scroll threshold (e.g. 100px)
+    if (isHeroCollapsed) {
       if (!showHeader) setShowHeader(true);
-      return;
+    } else {
+      if (scrollTop > 100) {
+        if (!showHeader) setShowHeader(true);
+      } else {
+        if (showHeader) setShowHeader(false);
+      }
     }
 
-    // Toggle header based on scroll threshold (e.g., 300px)
-    const scrollTop = mainRef.current.scrollTop;
-    if (scrollTop > 300) {
-      if (!showHeader) setShowHeader(true);
-      if (!hasEnteredExhibition) {
-        setHasEnteredExhibition(true);
-        // Replace instead of push to avoid history clutter when scrolling
-        window.location.replace('#/gallery');
-      }
-    } else if (scrollTop <= 300 && showHeader) {
-      setShowHeader(false);
+    // Auto-enter exhibition mode on scroll
+    if (scrollTop > 300 && !hasEnteredExhibition) {
+      setHasEnteredExhibition(true);
+      window.location.replace('#/gallery');
     }
-  }, [browseMode, genealogyThreadId, showHeader, hasEnteredExhibition]);
+  }, [isHeroCollapsed, showHeader, hasEnteredExhibition]);
+
+  // Trigger header logic when hero collapse state changes
+  useEffect(() => {
+    handleScroll();
+  }, [isHeroCollapsed, handleScroll]);
 
   return (
-    <div className="rpg-layout">
-      {/* Header is always shown for consistent access to Settings and Tabs */}
-      <header className="rpg-header">
+    <div className={`rpg-layout ${!showHeader ? 'rpg-layout--header-hidden' : ''}`}>
+      {/* Header visibility is controlled by rpg-header--hidden class for smooth animation */}
+      <header className={`rpg-header ${!showHeader ? 'rpg-header--hidden' : ''}`}>
         <h1 className="rpg-main-title">Only Details Matter</h1>
 
         <div className="rpg-header__controls">
+
           <div className="rpg-toggle-group">
             <button
               className={`rpg-jewel-btn red ${activeTab === 'local' ? 'active' : ''}`}
@@ -742,7 +761,8 @@ const Gallery = ({
 
       {/* MAIN LIST */}
       <main className="rpg-main" ref={mainRef} onScroll={handleScroll}>
-        {/* Hero always shows at top in wall mode (not genealogy tree) */}
+
+        {/* Hero component always in DOM for smooth animation (collapsed via class) */}
         {browseMode === 'wall' && !genealogyThreadId && (
           <LandingHero
             onBeginEvolution={() => {
@@ -750,75 +770,68 @@ const Gallery = ({
               onNewThread();
             }}
             onExploreExhibition={exploreExhibition}
+            onCollapse={toggleHero}
+            isCollapsed={isHeroCollapsed}
           />
         )}
 
-        {/* Search Panel - always visible below hero */}
+        {/* Search Panel - sticky relative to rpg-main, outside hero */}
         {browseMode === 'wall' && !genealogyThreadId && (
-          <div className="rpg-notice-panel">
-            <div style={{
-              display: 'flex',
-              gap: '10px',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: '10px'
-            }}>
-              <input
-                type="text"
-                className="rpg-search-input"
-                placeholder={`🔍 Search ${activeTab === 'local' ? 'local' : 'published'} threads...`}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  flex: 1,
-                  maxWidth: '400px',
-                  padding: '10px 15px',
-                  borderRadius: '20px',
-                  border: '1px solid var(--gold-dark)',
-                  background: 'rgba(0,0,0,0.3)',
-                  color: 'var(--text-primary)',
-                  fontSize: '0.95rem',
-                  fontFamily: "'Lato', sans-serif"
-                }}
-              />
-              {searchQuery && (
+          <div className="rpg-search-shelf">
+            <div className="rpg-notice-panel">
+              <div className="rpg-notice-panel__search-row">
+                {/* Hero collapse toggle */}
                 <button
-                  className="rpg-btn-text"
-                  onClick={() => setSearchQuery('')}
-                  style={{ padding: '5px 10px' }}
+                  className={`rpg-search-shelf__toggle ${!isHeroCollapsed ? 'active' : ''}`}
+                  onClick={toggleHero}
+                  title={isHeroCollapsed ? "Show Introduction" : "Minimize Introduction"}
                 >
-                  ✕ Clear
+                  ❧
                 </button>
+                <input
+                  type="text"
+                  className="rpg-search-input"
+                  placeholder={`🔍 Search ${activeTab === 'local' ? 'local' : 'published'} threads...`}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                {searchQuery && (
+                  <button
+                    className="rpg-btn-text"
+                    onClick={() => setSearchQuery('')}
+                  >
+                    ✕ Clear
+                  </button>
+                )}
+                {activeTab === 'cloud' && (
+                  <button
+                    className="rpg-btn-text"
+                    onClick={() => loadCloudGallery(true)}
+                    disabled={loadingCloud}
+                  >
+                    🔄 {loadingCloud ? 'Loading...' : 'Refresh'}
+                  </button>
+                )}
+              </div>
+              {/* Search status messages */}
+              {activeTab === 'cloud' && isSearching && (
+                <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                  Searching...
+                </div>
               )}
-              {activeTab === 'cloud' && (
-                <button
-                  className="rpg-btn-text"
-                  onClick={() => loadCloudGallery(true)}
-                  disabled={loadingCloud}
-                >
-                  🔄 {loadingCloud ? 'Loading...' : 'Refresh'}
-                </button>
+              {searchQuery && normalizedThreads.length > 0 && (
+                <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                  Found {normalizedThreads.length} thread{normalizedThreads.length !== 1 ? 's' : ''} matching "{searchQuery}"
+                </div>
+              )}
+              {searchQuery && normalizedThreads.length === 0 && !isSearching && (
+                <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                  No threads found matching "{searchQuery}"
+                </div>
               )}
             </div>
-            {/* Search status messages */}
-            {activeTab === 'cloud' && isSearching && (
-              <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                Searching...
-              </div>
-            )}
-            {searchQuery && normalizedThreads.length > 0 && (
-              <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                Found {normalizedThreads.length} thread{normalizedThreads.length !== 1 ? 's' : ''} matching "{searchQuery}"
-              </div>
-            )}
-            {searchQuery && normalizedThreads.length === 0 && !isSearching && (
-              <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                No threads found matching "{searchQuery}"
-              </div>
-            )}
           </div>
         )}
-
 
         {browseMode === 'wall' && !genealogyThreadId && (
           <div className="rpg-grid">
@@ -896,6 +909,33 @@ const Gallery = ({
               window.location.hash = '#/gallery';
             }}
           />
+        )}
+
+        {/* Exhibition Epilogue (Move manifesto text here) */}
+        {browseMode === 'wall' && !genealogyThreadId && (
+          <footer className="rpg-exhibition-epilogue">
+            <div className="rpg-exhibition-epilogue__inner">
+              <p className="rpg-exhibition-epilogue__tagline-upper">
+                <span className="flourish">❧</span>
+                discovery: the art of subtle creation...
+                <span className="flourish">❧</span>
+              </p>
+
+              <div className="rpg-exhibition-epilogue__divider">
+                <span className="ornament">❧</span>
+              </div>
+
+              <p className="rpg-exhibition-epilogue__tagline-lower">
+                witness the machine's creative obsession. provide a spark, then watch
+                the model anchor, weaving an autonomous narrative across the evolution
+                of its own discovered details.
+              </p>
+
+              <div className="rpg-exhibition-epilogue__flourish-bottom">
+                ❧ ❧ ❧
+              </div>
+            </div>
+          </footer>
         )}
       </main>
 
