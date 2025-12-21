@@ -27,24 +27,40 @@
   --text-muted: #8d7e71;
 }
 
-body {
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
   margin: 0;
+  padding: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+body {
   background-color: #1a100a;
   font-family: 'Lato', sans-serif;
   color: var(--text-primary);
-  height: 100vh;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  width: 100%;
   overflow: hidden;
+  position: relative;
 }
 
 /* === LAYOUT === */
 .rpg-layout {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  width: 100vw;
+  height: 100dvh;
+  width: 100%;
   position: relative;
-  overflow-x: hidden;
-  /* Added to prevent all horizontal leaks */
+  overflow: hidden;
 }
 
 /* === HEADER === */
@@ -53,16 +69,18 @@ body {
   flex-shrink: 0;
   background: linear-gradient(to bottom, #2b1d12 0%, #1a1008 100%);
   border-bottom: 2px solid var(--gold-dark);
-  position: sticky;
-  top: 0;
+  position: relative;
+  /* Changed from sticky to relative since it's a flex sibling */
   width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
-  z-index: 1000;
+  z-index: 2000;
+  /* Increased to stay above content */
   padding: 10px 0 20px 0;
+  padding-top: max(10px, env(safe-area-inset-top));
   transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
   will-change: transform, opacity, height, padding;
   overflow: hidden;
@@ -2077,10 +2095,38 @@ label {
 }
 
 .sidebar input:focus,
-.sidebar select:focus {
+.rpg-search-input:focus {
   outline: none;
   border-color: var(--gold-mid);
-  box-shadow: 0 0 8px rgba(197, 160, 89, 0.2);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.rpg-sync-status {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: 'Cinzel', serif;
+  font-size: 0.65rem;
+  color: var(--gold-light);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.8;
+  pointer-events: none;
+  animation: rpg-pulse 2s infinite ease-in-out;
+}
+
+@keyframes rpg-pulse {
+
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+
+  50% {
+    opacity: 0.9;
+  }
 }
 
 .sidebar select {
@@ -3696,17 +3742,17 @@ label {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    position: sticky;
-    top: 0;
-    z-index: 500;
-    background-color: #1a1008;
-    /* Fallback solid color */
+    position: relative;
+    /* Flex sibling in main-area */
+    z-index: 1500;
     background: linear-gradient(to bottom, #2b1d12 0%, #1a1008 100%);
     border-bottom: 2px solid var(--gold-dark);
     padding: 10px 12px;
+    padding-top: max(10px, env(safe-area-inset-top));
     margin: 0;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
     box-sizing: border-box;
+    flex-shrink: 0;
   }
 
   .mobile-back-title {

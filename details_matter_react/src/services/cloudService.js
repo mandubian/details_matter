@@ -43,9 +43,10 @@ export const uploadThread = async (threadData) => {
  * Fetch cloud gallery with offset-based pagination
  * @param {number} offset - Offset from start (default: 0)
  * @param {number} limit - Number of items per page (default: 20, max: 50)
+ * @param {boolean} bustCache - If true, bypass browser cache (use after publishing)
  * @returns {{ threads: Array, offset: number, total: number, hasMore: boolean }}
  */
-export const fetchCloudGalleryPage = async (offset = 0, limit = 20) => {
+export const fetchCloudGalleryPage = async (offset = 0, limit = 20, bustCache = false) => {
   const url = getWorkerUrl();
   if (!url) return { threads: [], offset: 0, total: 0, hasMore: false };
 
@@ -53,6 +54,9 @@ export const fetchCloudGalleryPage = async (offset = 0, limit = 20) => {
     const params = new URLSearchParams();
     params.set('offset', String(offset));
     params.set('limit', String(limit));
+    if (bustCache) {
+      params.set('_t', String(Date.now())); // Cache-buster
+    }
 
     const response = await fetch(`${url}/gallery?${params}`);
     if (!response.ok) throw new Error('Failed to fetch gallery');

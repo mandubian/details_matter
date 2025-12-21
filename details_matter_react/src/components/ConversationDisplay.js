@@ -32,8 +32,31 @@ const ConversationDisplay = ({
         const scrollTarget = document.getElementById(`turn-${scrollTargetIdx}`) || forkPointRef.current;
 
         if (scrollTarget) {
-          scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          hasScrolledRef.current = true;
+          const container = scrollTarget.closest('.main-area');
+          if (container) {
+            // Use 'auto' (instant) scroll on mobile to avoid triggering browser UI changes
+            // that can cause the header to collapse. Smooth scroll can cause layout issues
+            // on mobile Safari/Chrome when it interacts with browser chrome.
+            const isMobile = window.innerWidth <= 768;
+
+            // Calculate scroll position to center the element vertically in the container
+            const containerHeight = container.clientHeight;
+            const targetHeight = scrollTarget.offsetHeight;
+            const offsetTop = scrollTarget.offsetTop;
+            // Center the element: scroll so that the element's center is at container's center
+            const centeredScrollTop = offsetTop - (containerHeight / 2) + (targetHeight / 2);
+
+            container.scrollTo({
+              top: Math.max(0, centeredScrollTop),
+              behavior: isMobile ? 'auto' : 'smooth'
+            });
+            hasScrolledRef.current = true;
+          } else {
+            // Fallback: scroll only the element into view within its container
+            // Use block: 'center' to avoid pushing the header out of view
+            scrollTarget.scrollIntoView({ behavior: 'auto', block: 'center' });
+            hasScrolledRef.current = true;
+          }
         }
       }, 300);
       return () => clearTimeout(timer);

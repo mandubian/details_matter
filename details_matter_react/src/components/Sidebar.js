@@ -29,7 +29,8 @@ const Sidebar = ({
   onToggle,
   isRemote,
   onForkCloud,
-  isModal
+  isModal,
+  threadId // For GIF export filename
 }) => {
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [overrideKeyInput, setOverrideKeyInput] = useState('');
@@ -119,7 +120,7 @@ const Sidebar = ({
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `details-matter-${new Date().toISOString().slice(0, 10)}.gif`;
+      link.download = `details-matter-${threadId || 'thread'}-${new Date().toISOString().slice(0, 10)}.gif`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -288,7 +289,12 @@ const Sidebar = ({
                     className="primary-button"
                     onClick={onForkCloud}
                     disabled={isLoading}
-                    style={{ background: 'var(--accent-color)' }}
+                    style={{
+                      background: 'linear-gradient(to bottom, #c5a059, #8b6914)',
+                      color: '#ffffff',
+                      border: '1px solid #d4b06a',
+                      textShadow: '0 1px 2px rgba(0,0,0,0.4)'
+                    }}
                     title="Create your own copy of this published thread to edit"
                   >
                     🌱 Fork this Thread

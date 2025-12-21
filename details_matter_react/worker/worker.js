@@ -69,6 +69,33 @@ function extractStyles(threadData) {
   return Array.from(styles);
 }
 
+// Helper to process a base64 image and return its cloud URL
+async function processBase64Image(imageUrl, url, env) {
+  if (imageUrl && imageUrl.startsWith('data:')) {
+    try {
+      const [meta, base64Data] = imageUrl.split(',');
+      if (base64Data) {
+        const hash = await sha256(base64Data);
+        const mimeType = meta.split(':')[1].split(';')[0];
+        const ext = mimeType.split('/')[1] || 'bin';
+        const imageKey = `img-${hash}.${ext}`;
+
+        const exists = await env.GALLERY_BUCKET.head(imageKey);
+        if (!exists) {
+          const binary = base64ToArrayBuffer(base64Data);
+          await env.GALLERY_BUCKET.put(imageKey, binary, {
+            httpMetadata: { contentType: mimeType }
+          });
+        }
+        return `${url.origin}/image/${imageKey}`;
+      }
+    } catch (e) {
+      console.error("Failed to process image", e);
+    }
+  }
+  return imageUrl;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -190,45 +217,15 @@ export default {
         const threadId = data.threadId || crypto.randomUUID();
 
         // Process images: Extract, Hash, Store separately
-        // We modify the 'data' object in-place to replace base64 with URLs
         if (data.conversation && Array.isArray(data.conversation)) {
           for (let turn of data.conversation) {
-            if (turn.image && turn.image.startsWith('data:')) {
-              try {
-                // Parse base64
-                const [meta, base64Data] = turn.image.split(',');
-                if (base64Data) {
-                  // Hash content for deduplication
-                  const hash = await sha256(base64Data);
-                  const mimeType = meta.split(':')[1].split(';')[0];
-                  // Use hash as filename (e.g. img-a1b2c3d4.png)
-                  // Extension is just for clarity, R2 relies on stored content-type
-                  const ext = mimeType.split('/')[1] || 'bin';
-                  const imageKey = `img-${hash}.${ext}`;
-
-                  // Check if exists (optional optimization: skip checking if we trust hash collisions are rare and overwrites are cheap)
-                  // For R2, blindly putting is often faster/cheaper than checking head first,
-                  // but let's check to avoid bandwidth if possible? Actually, R2 Class A ops (put) cost money.
-                  // Checking head (Class B) is cheaper.
-                  const exists = await env.GALLERY_BUCKET.head(imageKey);
-
-                  if (!exists) {
-                    const binary = base64ToArrayBuffer(base64Data);
-                    await env.GALLERY_BUCKET.put(imageKey, binary, {
-                      httpMetadata: { contentType: mimeType }
-                    });
-                  }
-
-                  // Replace in JSON with public URL (relative to worker domain)
-                  // Format: /image/img-HASH.ext
-                  turn.image = `${url.origin}/image/${imageKey}`;
-                }
-              } catch (e) {
-                console.error("Failed to process image", e);
-                // Keep original base64 if processing fails
-              }
-            }
+            turn.image = await processBase64Image(turn.image, url, env);
           }
+        }
+
+        // Process parentImage in forkInfo as well
+        if (data.forkInfo && data.forkInfo.parentImage) {
+          data.forkInfo.parentImage = await processBase64Image(data.forkInfo.parentImage, url, env);
         }
 
         // Generate searchText and styles for the new thread
@@ -326,6 +323,11 @@ export default {
         const paginatedThreads = allThreads.slice(offset, offset + limit);
         const hasMore = offset + limit < allThreads.length;
 
+        const headers = new Headers(corsHeaders);
+        headers.set('Content-Type', 'application/json');
+        // Cache metadata for 60 seconds
+        headers.set('Cache-Control', 'public, max-age=60');
+
         return new Response(JSON.stringify({
           threads: paginatedThreads,
           offset: offset,
@@ -333,7 +335,7 @@ export default {
           total: allThreads.length,
           hasMore
         }), {
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+          headers
         });
       } catch (err) {
         return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
@@ -390,13 +392,18 @@ export default {
         // Sort by timestamp desc
         matchingThreads.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
 
+        const headers = new Headers(corsHeaders);
+        headers.set('Content-Type', 'application/json');
+        // Cache search results for 60 seconds
+        headers.set('Cache-Control', 'public, max-age=60');
+
         return new Response(JSON.stringify({
           threads: matchingThreads.slice(0, limit),
           query,
           styleFilter,
           count: matchingThreads.length
         }), {
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+          headers
         });
       } catch (err) {
         return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
@@ -415,8 +422,13 @@ export default {
         }
 
         const data = await object.text();
+        const headers = new Headers(corsHeaders);
+        headers.set('Content-Type', 'application/json');
+        // Use no-cache so browsers always revalidate - threads are mutable (can be re-published)
+        headers.set('Cache-Control', 'no-cache');
+
         return new Response(data, {
-          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+          headers
         });
       } catch (err) {
         return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });

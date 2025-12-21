@@ -440,12 +440,32 @@ function App() {
         }
       }
 
+      let repairedForkInfo = thread.forkInfo;
+      if (thread.forkInfo && thread.forkInfo.parentId && !thread.forkInfo.parentImage) {
+        // AUTOMATED REPAIR: If parentImage is missing, search backward in conversation
+        // A fork's conversation includes the parent's history up to the fork point.
+        const parentTurn = Number.isFinite(thread.forkInfo.parentTurn) ? thread.forkInfo.parentTurn : 0;
+        let foundImage = null;
+        if (thread.conversation && Array.isArray(thread.conversation)) {
+          for (let i = Math.min(parentTurn, thread.conversation.length - 1); i >= 0; i--) {
+            if (thread.conversation[i]?.image) {
+              foundImage = thread.conversation[i].image;
+              break;
+            }
+          }
+        }
+        if (foundImage) {
+          console.log('🩹 Repaired missing parentImage for upload:', thread.id);
+          repairedForkInfo = { ...thread.forkInfo, parentImage: foundImage };
+        }
+      }
+
       const threadData = {
         threadId: thread.id || thread.threadId,
         conversation: thread.conversation,
         style: thread.style,
         model: thread.model,
-        forkInfo: thread.forkInfo,
+        forkInfo: repairedForkInfo,
         timestamp: thread.timestamp || new Date().toISOString(),
         thumbnail, // Explicit thumbnail for gallery display
         title: thread.title || thread.conversation?.[0]?.text?.slice(0, 80) || 'Untitled Thread'
@@ -687,7 +707,7 @@ function App() {
         data = await fetchThread(id);
         setIsLoading(false);
       } else {
-        data = gallery.find(e => e.id === id);
+        data = gallery?.find(e => e.id === id);
       }
 
       if (data && data.conversation) {
@@ -754,7 +774,7 @@ function App() {
       const threadMatch = hash.match(/^#\/thread\/(.+)$/);
       if (threadMatch) {
         const id = threadMatch[1];
-        if (id === threadId && conversation.length > 0) {
+        if (id === threadId && conversation.length > 0 && !isRemote) {
           if (view !== 'editor') setView('editor');
           return;
         }
@@ -765,7 +785,7 @@ function App() {
       const cloudMatch = hash.match(/^#\/cloud\/(.+)$/);
       if (cloudMatch) {
         const id = cloudMatch[1];
-        if (id === threadId) {
+        if (id === threadId && isRemote) {
           if (view !== 'editor') setView('editor');
           return;
         }
@@ -803,7 +823,15 @@ function App() {
         const parentId = data.threadId || data.id;
         const parentTitle = data.title || (data.conversation?.[0]?.text?.slice(0, 80)) || 'Untitled Thread';
         const parentTurn = Math.max(0, data.conversation.length - 1);
-        const parentImage = data.conversation[parentTurn]?.image || null;
+
+        // Find the nearest image by searching backwards from the fork point
+        let parentImage = null;
+        for (let i = parentTurn; i >= 0; i--) {
+          if (data.conversation[i]?.image) {
+            parentImage = data.conversation[i].image;
+            break;
+          }
+        }
 
         // Content-based lineage: trace back to the true origin of this content
         // If the parent thread is itself a fork, and the fork point is before the parent's own fork point,
@@ -973,7 +1001,8 @@ function App() {
     isCollapsed: isSidebarCollapsed,
     onToggle: toggleSidebar,
     isRemote: isRemote,
-    onForkCloud: () => handleForkThread({ id: threadId, conversation, style, model, forkInfo }, isRemote)
+    onForkCloud: () => handleForkThread({ id: threadId, conversation, style, model, forkInfo }, isRemote),
+    threadId, // For GIF export filename
   };
 
   // True full-bleed gallery: do NOT render under `.app` which is max-width constrained.

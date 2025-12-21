@@ -122,7 +122,7 @@ const prepareContents = async (prompt, context, previousImage, style) => {
 
   if (previousImage) {
     try {
-      // Convert blob URL or data URL to base64 for the API
+      // Convert blob URL, data URL, or remote URL to base64 for the API
       let imageData, mimeType;
 
       if (previousImage.startsWith('data:')) {
@@ -142,8 +142,24 @@ const prepareContents = async (prompt, context, previousImage, style) => {
           reader.onload = () => resolve(reader.result.split(',')[1]);
           reader.readAsDataURL(blob);
         });
+      } else if (previousImage.startsWith('http://') || previousImage.startsWith('https://')) {
+        // Handle remote URL (e.g., from cloud storage) - fetch and convert
+        console.log('📥 Fetching remote image for AI processing:', previousImage.slice(0, 80) + '...');
+        const response = await fetch(previousImage);
+        if (!response.ok) {
+          throw new Error(`Failed to fetch remote image: ${response.status}`);
+        }
+        const blob = await response.blob();
+        mimeType = blob.type || 'image/webp'; // Default to webp as that's what cloud stores
+
+        // Convert blob to base64
+        const reader = new FileReader();
+        imageData = await new Promise((resolve) => {
+          reader.onload = () => resolve(reader.result.split(',')[1]);
+          reader.readAsDataURL(blob);
+        });
       } else {
-        throw new Error('Unsupported image format');
+        throw new Error('Unsupported image format: ' + previousImage.slice(0, 30));
       }
 
       contents = [

@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { fetchCloudGalleryPage, searchCloudGallery, getWorkerUrl, setWorkerUrl } from '../services/cloudService';
+import { getKey, saveKey } from '../utils/db';
 import GenealogyTree from './GenealogyTree';
 import LandingHero from './LandingHero';
 import HelpPage from './HelpPage';
@@ -25,9 +26,11 @@ const Gallery = ({
   const [previewIndex, setPreviewIndex] = useState(0);
   const [cloudThreads, setCloudThreads] = useState([]);
   // eslint-disable-next-line no-unused-vars
-  const [loadingCloud, setLoadingCloud] = useState(false);
-  // eslint-disable-next-line no-unused-vars
   const [workerUrlInput, setWorkerUrlInput] = useState(getWorkerUrl() || '');
+  const [loadingCloud, setLoadingCloud] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [uploadingThreadId, setUploadingThreadId] = useState(null); // Track which thread is being uploaded
+  const [cacheLoaded, setCacheLoaded] = useState(false);
   const [isConfiguring] = useState(!getWorkerUrl());
   const [treePan, setTreePan] = useState({ x: 0, y: 0 });
   const [treeZoom, setTreeZoom] = useState(1);
@@ -83,8 +86,8 @@ const Gallery = ({
 
   // Reset scroll position when gallery mounts
   useEffect(() => {
-    if (!hasEnteredExhibition) {
-      window.scrollTo(0, 0);
+    if (!hasEnteredExhibition && mainRef.current) {
+      mainRef.current.scrollTo(0, 0);
     }
   }, [hasEnteredExhibition]);
 
@@ -95,8 +98,10 @@ const Gallery = ({
   onCloudGalleryLoadedRef.current = onCloudGalleryLoaded;
 
   // Load cloud gallery - memoized with stable dependencies only
-  const loadCloudGallery = useCallback(async (reset = true) => {
+  // bustCache: when true, bypasses browser/Cloudflare cache (use after publishing)
+  const loadCloudGallery = useCallback(async (reset = true, bustCache = false) => {
     setLoadingCloud(true);
+    if (reset) setIsSyncing(true);
     let loadedThreads = [];
     try {
       if (searchQuery.trim()) {
@@ -111,11 +116,13 @@ const Gallery = ({
       } else {
         // Use offset-based paginated fetch
         const offset = reset ? 0 : cloudOffsetRef.current;
-        const result = await fetchCloudGalleryPage(offset, 20);
+        const result = await fetchCloudGalleryPage(offset, 20, bustCache);
         loadedThreads = result.threads || [];
         if (reset) {
           setCloudThreads(loadedThreads);
           cloudOffsetRef.current = loadedThreads.length;
+          // Cache the first page for instant loading next time
+          saveKey('cloud_gallery_cache', loadedThreads).catch(err => console.error('Cache save error:', err));
         } else {
           setCloudThreads(prev => [...prev, ...loadedThreads]);
           cloudOffsetRef.current = offset + loadedThreads.length;
@@ -132,7 +139,27 @@ const Gallery = ({
       console.error('Cloud gallery load error:', err);
     }
     setLoadingCloud(false);
+    setIsSyncing(false);
   }, [searchQuery]); // Only depend on searchQuery, not on callback prop
+
+  // Initial cache load for instant UI
+  useEffect(() => {
+    const loadCache = async () => {
+      if (activeTab === 'cloud' && !cacheLoaded) {
+        try {
+          const cached = await getKey('cloud_gallery_cache');
+          if (cached && Array.isArray(cached) && cached.length > 0) {
+            console.log('⚡ Loaded cloud gallery from cache:', cached.length, 'threads');
+            setCloudThreads(cached);
+          }
+        } catch (err) {
+          console.error('Cache load error:', err);
+        }
+        setCacheLoaded(true);
+      }
+    };
+    loadCache();
+  }, [activeTab, cacheLoaded]);
 
   // Load cloud gallery when tab switches or config changes
   useEffect(() => {
@@ -167,14 +194,18 @@ const Gallery = ({
   // Wrapper for upload that refreshes cloud gallery after success
   const handleUploadToCloud = async (thread) => {
     if (!onUploadToCloud) return;
+    const threadId = thread.id || thread.threadId;
+    setUploadingThreadId(threadId);
     try {
       await onUploadToCloud(thread);
-      // Refresh cloud gallery after successful publish
+      // Refresh cloud gallery after successful publish with cache-busting
       setTimeout(() => {
-        loadCloudGallery();
+        loadCloudGallery(true, true); // reset=true, bustCache=true
       }, 500); // Small delay to ensure backend has updated
     } catch (err) {
       console.error('Publish failed:', err);
+    } finally {
+      setUploadingThreadId(null);
     }
   };
 
@@ -386,9 +417,8 @@ const Gallery = ({
   const exploreExhibition = () => {
     setHasEnteredExhibition(true);
     window.location.hash = '#/gallery';
-    const grid = document.querySelector('.rpg-grid') || document.querySelector('.rpg-main');
-    if (grid) {
-      grid.scrollIntoView({ behavior: 'smooth' });
+    if (mainRef.current) {
+      mainRef.current.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -411,12 +441,16 @@ const Gallery = ({
     // Get the very first image in the conversation (the origin) for the vignette
     // This is different from getPreviewImages which shows post-fork images for forks
     const originImage = (() => {
+      // Prioritize explicit parentImage for forks
+      if (thread?.forkInfo?.parentImage) return thread.forkInfo.parentImage;
+
+      // Fallback: search the thread's own conversation (for local threads or if full data is available)
       if (thread?.conversation && Array.isArray(thread.conversation)) {
         const firstWithImage = thread.conversation.find(t => t?.image);
         if (firstWithImage?.image) return firstWithImage.image;
       }
-      // Fallback to parentImage if no images in conversation
-      return thread?.forkInfo?.parentImage || null;
+
+      return null;
     })();
 
     const handleDeleteClick = (e) => {
@@ -617,8 +651,24 @@ const Gallery = ({
                 const currentTurnCount = Number(thread.conversation?.length) || 0;
                 const publishedCount = Number(thread.publishedTurnCount) || 0;
                 const isSynced = isPublished && (publishedCount === currentTurnCount);
+                const isUploading = uploadingThreadId === thread.id;
 
-                if (!isPublished) {
+                if (isUploading) {
+                  // Currently uploading
+                  return (
+                    <button
+                      className="rpg-btn-small"
+                      disabled
+                      style={{
+                        background: 'linear-gradient(to bottom, #6a5d4a, #4d4235)',
+                        cursor: 'wait',
+                      }}
+                    >
+                      <span className="spinner small" style={{ marginRight: '4px' }}></span>
+                      Publishing...
+                    </button>
+                  );
+                } else if (!isPublished) {
                   // Never published
                   return (
                     <button
@@ -630,19 +680,19 @@ const Gallery = ({
                     </button>
                   );
                 } else if (isSynced) {
-                  // Published and in sync
+                  // Published and in sync - keep clickable for force re-sync
                   return (
-                    <span
+                    <button
                       className="rpg-btn-small"
+                      onClick={() => handleUploadToCloud(thread)}
                       style={{
                         background: 'linear-gradient(to bottom, #5c6a51, #3d4a35)',
-                        color: '#a8d4a0',
-                        cursor: 'default'
+                        color: '#b0d6a8', // Slightly brighter for clickable feel
                       }}
-                      title="Published and synchronized"
+                      title="Published and synchronized - click to force re-sync"
                     >
                       ✓ Synced
-                    </span>
+                    </button>
                   );
                 } else {
                   // Published but out of sync
@@ -710,6 +760,7 @@ const Gallery = ({
     // Auto-enter exhibition mode on scroll
     if (scrollTop > 300 && !hasEnteredExhibition) {
       setHasEnteredExhibition(true);
+      // Use replace instead of replaceState to avoid history bloat
       window.location.replace('#/gallery');
     }
   }, [isHeroCollapsed, showHeader, hasEnteredExhibition]);
@@ -795,6 +846,7 @@ const Gallery = ({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
+                {isSyncing && <div className="rpg-sync-status">Syncing...</div>}
                 {searchQuery && (
                   <button
                     className="rpg-btn-text"
