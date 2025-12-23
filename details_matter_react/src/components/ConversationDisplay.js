@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Turn from './Turn';
-
-import { STYLES } from '../constants/styles';
+import StylePicker from './StylePicker';
 
 const ConversationDisplay = ({
   conversation,
@@ -159,16 +158,12 @@ const ConversationDisplay = ({
                 </span>
 
                 <div className="floating-action-bar__style-selector">
-                  <select
-                    value={style}
-                    onChange={(e) => onStyleChange && onStyleChange(e.target.value)}
+                  <StylePicker
+                    selectedStyles={style}
+                    onStyleChange={onStyleChange}
+                    compact={true}
                     disabled={isLoading}
-                    title="Change Art Style"
-                  >
-                    {STYLES.map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
+                  />
                 </div>
 
                 <button

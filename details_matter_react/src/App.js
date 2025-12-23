@@ -25,7 +25,18 @@ function App() {
       // We no longer load conversation from localStorage to avoid quota limits
       const savedConversation = [];
       const savedCurrentTurn = localStorage.getItem('details_matter_current_turn');
-      const savedStyle = localStorage.getItem('details_matter_style');
+      const savedStyleRaw = localStorage.getItem('details_matter_style');
+      // Parse styles - support both legacy single string and new JSON array format
+      let savedStyle = ['Photorealistic'];
+      if (savedStyleRaw) {
+        try {
+          const parsed = JSON.parse(savedStyleRaw);
+          savedStyle = Array.isArray(parsed) ? parsed : [parsed];
+        } catch {
+          // Legacy single string format
+          savedStyle = [savedStyleRaw];
+        }
+      }
       const savedModel = localStorage.getItem('details_matter_model');
       const savedApiKey = localStorage.getItem('details_matter_api_key');
       const savedThreadId = localStorage.getItem('details_matter_thread_id');
@@ -37,7 +48,7 @@ function App() {
       return {
         conversation: savedConversation,
         currentTurn: Number.isFinite(computedTurn) ? computedTurn : 0,
-        style: savedStyle || 'Photorealistic',
+        style: savedStyle,
         model: savedModel || 'gemini-2.5-flash',
         apiKey: savedApiKey || '',
         isApiKeySet: !!savedApiKey,
@@ -50,7 +61,7 @@ function App() {
       return {
         conversation: [],
         currentTurn: 0,
-        style: 'Photorealistic',
+        style: ['Photorealistic'],
         model: 'gemini-2.5-flash',
         apiKey: '',
         isApiKeySet: false,
@@ -189,7 +200,7 @@ function App() {
       }
 
       if (newStyle) {
-        setStyle(newStyle);
+        setStyle(Array.isArray(newStyle) ? newStyle : [newStyle]);
       }
 
       setSuccess('Session imported successfully!');
@@ -243,7 +254,7 @@ function App() {
   }, [currentTurn]);
 
   useEffect(() => {
-    localStorage.setItem('details_matter_style', style);
+    localStorage.setItem('details_matter_style', JSON.stringify(style));
   }, [style]);
 
   useEffect(() => {
@@ -337,9 +348,44 @@ function App() {
     }
   };
 
-  // Handle style change
+  // Handle style change - supports add/remove/set operations
+  // newStyle can be:
+  //   - string: toggle this style (add if not present, remove if present)
+  //   - array: replace all styles with this array
+  //   - object: { action: 'add'|'remove'|'set', style: string|string[] }
   const handleStyleChange = (newStyle) => {
-    setStyle(newStyle);
+    if (typeof newStyle === 'string') {
+      // Toggle mode: add if not present, remove if present (but keep at least one)
+      setStyle(prev => {
+        const currentStyles = Array.isArray(prev) ? prev : (prev ? [prev] : ['Photorealistic']);
+        if (currentStyles.includes(newStyle)) {
+          return currentStyles.filter(s => s !== newStyle);
+        }
+        return [...currentStyles, newStyle];
+      });
+    } else if (Array.isArray(newStyle)) {
+      // Replace all styles
+      setStyle(newStyle.length > 0 ? newStyle : ['Photorealistic']);
+    } else if (newStyle && typeof newStyle === 'object') {
+      // Action-based update
+      const { action, style: targetStyle } = newStyle;
+      setStyle(prev => {
+        const currentStyles = Array.isArray(prev) ? prev : (prev ? [prev] : ['Photorealistic']);
+        if (action === 'add') {
+          const toAdd = Array.isArray(targetStyle) ? targetStyle : [targetStyle];
+          const newStyles = [...currentStyles, ...toAdd.filter(s => !currentStyles.includes(s))];
+          return newStyles;
+        } else if (action === 'remove') {
+          const toRemove = Array.isArray(targetStyle) ? targetStyle : [targetStyle];
+          const newStyles = currentStyles.filter(s => !toRemove.includes(s));
+          return newStyles;
+        } else if (action === 'set') {
+          const toSet = Array.isArray(targetStyle) ? targetStyle : [targetStyle];
+          return toSet.length > 0 ? toSet : ['Photorealistic'];
+        }
+        return currentStyles;
+      });
+    }
   };
 
   // Handle model change
@@ -713,7 +759,11 @@ function App() {
       if (data && data.conversation) {
         setConversation(data.conversation);
         setCurrentTurn(data.conversation.length);
-        setStyle(data.style || style);
+
+        // Normalize style to array (support legacy string format)
+        const loadedStyle = data.style || style;
+        setStyle(Array.isArray(loadedStyle) ? loadedStyle : [loadedStyle]);
+
         setModel(data.model || model);
         setThreadId(data.threadId || data.id || `thread-${Date.now()}`);
         setForkInfo(data.forkInfo || null);
@@ -850,7 +900,9 @@ function App() {
 
         setConversation(data.conversation);
         setCurrentTurn(data.conversation.length);
-        setStyle(data.style || style);
+        // Normalize style to array (support legacy string format)
+        const loadedStyle = data.style || style;
+        setStyle(Array.isArray(loadedStyle) ? loadedStyle : [loadedStyle]);
         setModel(data.model || model);
         const newThreadId = `thread-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
         setThreadId(newThreadId);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { STYLES } from '../constants/styles';
+import StylePicker from './StylePicker';
 import { AVAILABLE_MODELS, fetchAvailableModels } from '../utils/googleAI';
 import { generateGif } from '../utils/gifGenerator';
 
@@ -353,17 +353,12 @@ const Sidebar = ({
           {/* Art Style Section */}
           {isApiKeySet && (
             <div className="section">
-              <h3>🎨 Style</h3>
-              <select
-                value={style}
-                onChange={(e) => onStyleChange(e.target.value)}
-              >
-                {STYLES.map(styleOption => (
-                  <option key={styleOption} value={styleOption}>
-                    {styleOption}
-                  </option>
-                ))}
-              </select>
+              <h3>🎨 Styles</h3>
+              <StylePicker
+                selectedStyles={style}
+                onStyleChange={onStyleChange}
+                disabled={isLoading}
+              />
             </div>
           )}
 

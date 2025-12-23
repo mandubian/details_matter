@@ -112,7 +112,9 @@ const Turn = ({ turn, index, canRegenerate = false, onRegenerate, onUndo, onFork
             <span className="turn-image-label">
               {turn.model_name === 'Human Input' ? '👤 Initial' : `🎨 Turn ${index}`}
             </span>
-            <span className="turn-image-style">{turn.style || ''}</span>
+            <span className="turn-image-style">
+              {Array.isArray(turn.style) ? turn.style.join(' • ') : (turn.style || '')}
+            </span>
           </div>
 
           <img

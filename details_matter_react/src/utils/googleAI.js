@@ -115,7 +115,9 @@ export const fetchAvailableModels = async (apiKey) => {
 const prepareContents = async (prompt, context, previousImage, style) => {
   let fullPrompt = context ? `${context}\n\n${prompt}` : prompt;
   if (style) {
-    fullPrompt += `\nStyle: ${style}.`;
+    // Support both single style string and array of styles
+    const styleStr = Array.isArray(style) ? style.join(' + ') : style;
+    fullPrompt += `\nStyle: ${styleStr}.`;
   }
 
   let contents;
